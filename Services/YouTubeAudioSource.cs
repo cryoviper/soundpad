@@ -266,6 +266,11 @@ namespace BoomBx.Services
             _count -= count;
         }
 
+        private static void Silence(float[] buffer, int offset, int count)
+        {
+            for (int i = 0; i < count; i++) buffer[offset + i] = 0f;
+        }
+
         public void Complete()
         {
             lock (_lock) _completed = true;
@@ -284,26 +289,26 @@ namespace BoomBx.Services
                     }
                     else
                     {
-                        Array.Clear(buffer, offset, count);
+                        Silence(buffer, offset, count);
                         return count; // still buffering - play silence
                     }
                 }
 
+                // NOTE: NAudio hands us a byte[] disguised as float[] (WaveBuffer trick),
+                // so Array.Copy / Array.Clear crash here. Plain loops are safe.
                 int toRead = Math.Min(count, _count);
-                int done = 0;
-                while (done < toRead)
+                for (int i = 0; i < toRead; i++)
                 {
-                    int part = Math.Min(toRead - done, _buffer.Length - _readPos);
-                    Array.Copy(_buffer, _readPos, buffer, offset + done, part);
-                    _readPos = (_readPos + part) % _buffer.Length;
-                    done += part;
+                    buffer[offset + i] = _buffer[_readPos];
+                    _readPos++;
+                    if (_readPos == _buffer.Length) _readPos = 0;
                 }
                 _count -= toRead;
 
                 if (toRead < count)
                 {
                     if (_completed) return toRead; // finished (0 = stop)
-                    Array.Clear(buffer, offset + toRead, count - toRead); // network hiccup - pad with silence
+                    Silence(buffer, offset + toRead, count - toRead); // hiccup - pad with silence
                 }
                 return count;
             }

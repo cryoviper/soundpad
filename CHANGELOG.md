@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/)
 
+## [0.2.2]
+### Fixed
+- "Speaker output error: Source array type cannot be assigned..." when playing YouTube clips
+- Version label no longer shows the long build hash
+
 ## [0.2.1]
 ### Fixed
 - YouTube clips getting stuck at 0:00 with no sound: audio is now pulled into memory first (still never saved to disk), then played
