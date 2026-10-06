@@ -81,6 +81,28 @@ namespace BoomBx.Models
             }
         }
 
+        // ---------------- Hotkey ----------------
+
+        private string? _hotkey;
+        /// <summary>Global hotkey that plays this sound, e.g. "Ctrl+NumPad1". Null = none.</summary>
+        public string? Hotkey
+        {
+            get => _hotkey;
+            set
+            {
+                _hotkey = string.IsNullOrWhiteSpace(value) ? null : value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasHotkey));
+                OnPropertyChanged(nameof(HotkeyText));
+            }
+        }
+
+        [JsonIgnore]
+        public bool HasHotkey => _hotkey != null;
+
+        [JsonIgnore]
+        public string HotkeyText => _hotkey ?? "None";
+
         // ---------------- YouTube sounds (streamed live, never downloaded) ----------------
 
         private string? _youTubeId;

@@ -1,103 +1,118 @@
 using BoomBx.Models;
-using BoomBx.ViewModels;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using VoiceInfo = BoomBx.Models.VoiceInfo;
 
 namespace BoomBx.Services
 {
-    public class TtsService
+    /// <summary>
+    /// Text to speech: Microsoft neural voices (online, natural, Hindi + 100 languages)
+    /// with eSpeak as an offline fallback.
+    /// </summary>
+    public sealed class TtsService
     {
-        private readonly MainWindowViewModel _viewModel;
-        private MemoryStream? _ttsAudioStream;
-        private ESpeakGenerator? _espeakGenerator;
-        
-        public TtsService(MainWindowViewModel viewModel)
-        {
+        private ESpeakGenerator? _espeak;
+        private bool _espeakTried;
+        private readonly object _cacheLock = new();
+        private readonly LinkedList<(string Key, TtsAudio Audio)> _cache = new();
 
-            _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
-            InitializeESpeak();
-        }
+        public List<TtsVoice> Voices { get; private set; } = NeuralTtsClient.BuiltInVoices();
 
-        private void InitializeESpeak()
+        /// <summary>Downloads the full Microsoft voice list and adds offline voices. Safe to call many times.</summary>
+        public async Task<List<TtsVoice>> LoadAllVoicesAsync(CancellationToken ct)
         {
+            var voices = new List<TtsVoice>();
             try
             {
-                _espeakGenerator = new ESpeakGenerator();
-                _espeakGenerator.Initialize();
-                RefreshVoices();
-                Console.WriteLine("TTS Service initialized successfully");
+                voices.AddRange(await NeuralTtsClient.GetVoicesAsync(ct));
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"eSpeak initialization error: {ex.Message}");
-                throw new Exception($"Failed to initialize text-to-speech: {ex.Message}", ex);
+                Logger.Log($"[TTS] voice list download failed, using built-in list: {ex.Message}");
+                voices.AddRange(NeuralTtsClient.BuiltInVoices());
             }
+
+            foreach (var name in await Task.Run(GetESpeakVoices, ct))
+                voices.Add(new TtsVoice { Id = name, Locale = "espeak", Engine = TtsEngine.ESpeak });
+
+            Voices = voices;
+            return voices;
         }
-        
+
+        public async Task<TtsAudio> SpeakAsync(string text, TtsVoice voice, int ratePercent, int pitchHz, CancellationToken ct)
+        {
+            text = text.Trim();
+            if (text.Length == 0) throw new InvalidOperationException("Type something first.");
+            if (text.Length > 2000) text = text[..2000];
+
+            var key = $"{voice.Engine}|{voice.Id}|{ratePercent}|{pitchHz}|{text}";
+            lock (_cacheLock)
+            {
+                var hit = _cache.FirstOrDefault(c => c.Key == key);
+                if (hit.Audio != null) return hit.Audio;
+            }
+
+            TtsAudio audio;
+            if (voice.Engine == TtsEngine.Neural)
+            {
+                var mp3 = await NeuralTtsClient.SynthesizeAsync(text, voice.Id, ratePercent, pitchHz, ct);
+                audio = new TtsAudio(mp3, ".mp3");
+            }
+            else
+            {
+                var espeak = await Task.Run(GetESpeak, ct) ?? throw new InvalidOperationException("Offline voices are not available.");
+                // eSpeak takes speed/pitch as multipliers around 1.0
+                using var wav = await espeak.GenerateSpeechAsync(text, voice.Id,
+                    (float)Math.Clamp(1 + ratePercent / 100.0, 0.3, 3.0),
+                    (float)Math.Clamp(1 + pitchHz / 100.0, 0.3, 2.0));
+                audio = new TtsAudio(wav.ToArray(), ".wav");
+            }
+
+            lock (_cacheLock)
+            {
+                _cache.AddFirst((key, audio));
+                while (_cache.Count > 30) _cache.RemoveLast();
+            }
+            return audio;
+        }
+
         public void Cleanup()
         {
-            _espeakGenerator?.Cleanup();
+            try { _espeak?.Cleanup(); } catch { /* ignore */ }
         }
 
-        public void RefreshVoices()
+        private IEnumerable<string> GetESpeakVoices()
         {
-            _viewModel.AvailableVoices.Clear();
+            var espeak = GetESpeak();
+            if (espeak == null) return Array.Empty<string>();
+            try { return espeak.GetAvailableVoices().ToList(); }
+            catch { return Array.Empty<string>(); }
+        }
 
-            if (_espeakGenerator != null)
+        private ESpeakGenerator? GetESpeak()
+        {
+            lock (_cacheLock)
             {
-                foreach (var voice in _espeakGenerator.GetAvailableVoices())
-                {
-                    _viewModel.AvailableVoices.Add(new VoiceInfo { Name = voice });
-                }
-                _viewModel.SelectedVoice = _viewModel.AvailableVoices.FirstOrDefault();
+                if (_espeakTried) return _espeak;
+                _espeakTried = true;
             }
-        }
-
-        public async Task GenerateTtsAudioAsync()
-        {
-            if (string.IsNullOrWhiteSpace(_viewModel.TtsText)) 
-                throw new Exception("Please enter text to speak");
-            
-            if (_espeakGenerator == null)
-                throw new Exception("Text-to-speech engine not initialized");
-
             try
             {
-                _ttsAudioStream?.Dispose();
-                
-                _ttsAudioStream = await _espeakGenerator.GenerateSpeechAsync(
-                    text: _viewModel.TtsText,
-                    voice: _viewModel.SelectedVoice?.Name ?? "en",
-                    speed: (float)_viewModel.TtsSpeed,
-                    pitch: (float)_viewModel.TtsPitch
-                );
+                var e = new ESpeakGenerator();
+                e.Initialize();
+                _espeak = e;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"TTS Generation Error: {ex.Message}");
-                throw new Exception($"Failed to generate speech: {ex.Message}", ex);
+                Logger.Log($"[TTS] eSpeak not available: {ex.Message}");
             }
-        }
-
-        public MemoryStream? GetAudioStream()
-        {
-            if (_ttsAudioStream != null)
-            {
-                _ttsAudioStream.Position = 0;
-            }
-            return _ttsAudioStream;
-        }
-
-        public void SaveToSoundboard(string filePath)
-        {
-            if (_ttsAudioStream == null) return;
-
-            using var fileStream = File.Create(filePath);
-            _ttsAudioStream.Position = 0;
-            _ttsAudioStream.CopyTo(fileStream);
+            return _espeak;
         }
     }
+
+    /// <summary>Spoken audio in memory plus its file type (.mp3 or .wav).</summary>
+    public sealed record TtsAudio(byte[] Data, string Extension);
 }

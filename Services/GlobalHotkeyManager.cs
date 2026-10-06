@@ -27,14 +27,15 @@ namespace BoomBx.Services
         {
             var modifiers = ConvertModifiers(gesture.KeyModifiers);
             var key = ConvertKey(gesture.Key);
+            if (key == KeyCode.VcUndefined) return;
             var hotkey = new Hotkey(modifiers, key);
 
-            _actions[hotkey] = action;
+            lock (_actions) _actions[hotkey] = action;
         }
 
         public void UnregisterAll()
         {
-            _actions.Clear();
+            lock (_actions) _actions.Clear();
         }
         
         private void OnKeyPressed(object? sender, KeyboardHookEventArgs e)
@@ -63,8 +64,9 @@ namespace BoomBx.Services
 
             var hotkey = new Hotkey((ushort)modifiers, key);
 
-            if (_actions.TryGetValue(hotkey, out var action))
-                action();
+            Action? action;
+            lock (_actions) _actions.TryGetValue(hotkey, out action);
+            action?.Invoke();
         }
 
 

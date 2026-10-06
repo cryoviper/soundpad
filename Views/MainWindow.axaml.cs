@@ -32,7 +32,8 @@ namespace BoomBx.Views
 {
     public partial class MainWindow : Window
     {
-        private readonly AppSettings _settings = new();
+        // Loaded first so every service shares the same settings object.
+        private readonly AppSettings _settings = SettingsManager.LoadSettings();
 
         private bool _installationDismissed;
         private GlobalHotkeyManager? _hotkeyManager;
@@ -89,8 +90,10 @@ namespace BoomBx.Views
             );
 
             InitializeAudioService();
+            InitializeMixer();
             InitializeTts();
             InitializeYouTube();
+            InitializeSoundboardExtras();
             this.Closing += (s, e) =>
             {
                 _ttsService?.Cleanup();
@@ -100,7 +103,6 @@ namespace BoomBx.Views
             this.WindowState = WindowState.Normal;
             this.Opacity = 1;
             this.IsVisible = false;
-            _settings = SettingsManager.LoadSettings();
             Console.WriteLine("[3] Window properties set");
         }
 
@@ -226,7 +228,7 @@ namespace BoomBx.Views
                 _hotkeyManager?.RegisterHotkey(pauseGesture, OnPauseHotkey);
                 ViewModel.PauseHotkey = pauseGesture.ToString();
 
-                UpdateStatus("Hotkeys loaded successfully.", false);
+                RegisterSoundHotkeys();
             }
             catch (Exception ex)
             {
@@ -277,6 +279,12 @@ namespace BoomBx.Views
 
         private void Hotkey_KeyDown(object? sender, KeyEventArgs e)
         {
+            if (_soundGettingHotkey != null)
+            {
+                FinishSoundHotkey(e);
+                return;
+            }
+
             if (_currentlySettingHotkey == null)
             {
                 this.KeyDown -= Hotkey_KeyDown;
@@ -676,29 +684,15 @@ namespace BoomBx.Views
 
             var files = await this.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                Title = "Add Audio Files",
+                Title = "Add sounds",
                 AllowMultiple = true,
                 FileTypeFilter = new List<FilePickerFileType>
                 {
-                    new("Audio Files") { Patterns = new[] { "*.mp3", "*.wav" } }
+                    new("Audio files") { Patterns = SupportedAudioPatterns }
                 }
             });
 
-            foreach (var file in files)
-            {
-                var path = file.Path.LocalPath;
-                if (!ViewModel.SelectedSoundboard.Sounds.Any(s => s.Path == path))
-                {
-                    var newItem = new SoundItem
-                    {
-                        Path = path,
-                        Name = System.IO.Path.GetFileNameWithoutExtension(path)
-                    };
-                    newItem.PropertyChanged += SoundItem_PropertyChanged;
-                    ViewModel.SelectedSoundboard.Sounds.Add(newItem);
-                }
-            }
-            SaveSoundLibrary();
+            AddFilesToBoard(files.Select(f => f.TryGetLocalPath()).Where(p => p != null)!);
         }
 
         public void RemoveFromLibrary(object? sender, RoutedEventArgs e)
@@ -708,6 +702,7 @@ namespace BoomBx.Views
             {
                 ViewModel.SelectedSoundboard.Sounds.Remove(ViewModel.SelectedSound);
                 SaveSoundLibrary();
+                LoadAndRegisterHotkeys();
             }
         }
 
@@ -752,8 +747,7 @@ namespace BoomBx.Views
             if (ViewModel.SelectedSound != null)
             {
                 SaveSoundLibrary();
-                LoadSoundLibrary();
-                UpdateStatus("Changes saved successfully!");
+                UpdateStatus("Saved");
             }
         }
 
@@ -800,9 +794,12 @@ namespace BoomBx.Views
 
                 if (!ViewModel.Soundboards.Any())
                 {
-                    var defaultBoard = new Soundboard { Name = "Default" };
+                    var defaultBoard = new Soundboard { Name = "My sounds" };
                     ViewModel.Soundboards.Add(defaultBoard);
                 }
+
+                if (ViewModel.SelectedSoundboard == null || !ViewModel.Soundboards.Contains(ViewModel.SelectedSoundboard))
+                    ViewModel.SelectedSoundboard = ViewModel.Soundboards.FirstOrDefault();
             }
             catch (Exception ex)
             {

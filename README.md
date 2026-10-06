@@ -6,18 +6,20 @@
 
 <p align="center">
   Free soundboard for your virtual mic, plus a <b>YouTube Live</b> tab:<br>
-  search any sound or song and it plays straight into Discord or your game. No downloading.
+  search any sound or song and it plays straight into Discord or your game.
 </p>
 
 ---
 
 ## What it does
 
-- **YouTube Live:** type "vine boom", "bruh sound effect", any song, or paste a YouTube link. Hit ▶ and your friends hear it right away. The audio streams live and never gets saved as a file.
-- **Pin to soundboard:** hit ⭐ on any result to keep it on your board, with an optional start and end time. It works with hotkeys, volume, bass, treble and pitch just like normal sounds.
-- **Normal soundboard:** add your own MP3 or WAV files, set icons and use hotkeys.
-- **Text-to-Speech:** type text and it speaks through your mic.
-- **Mic passthrough:** your real mic and the sounds get mixed together, so you can talk over them.
+- **YouTube Live:** search any sound or song (or paste a link), hit ▶ and friends hear it instantly. Drag the bar to jump around.
+- **Cut a clip:** mark start and end while it plays, preview it, then **Pin** it (streams, takes no space) or **Save MP3** (offline file, auto-added to your board).
+- **Text to Speech:** natural Microsoft voices in Hindi, English (India/US/UK) and 100+ languages. Pick speed and pitch, Ctrl+Enter to speak, save lines to your board.
+- **Hotkeys per sound:** right-click a sound → Set hotkey. Press once to play, again to stop.
+- **Drag & drop:** drop MP3/WAV/M4A/FLAC files (or a whole folder) onto the board.
+- **Mixer:** separate volume for what friends hear and what you hear, mic volume, mute, and a noise gate with a live meter so games don't pick up hiss.
+
 
 ## Setup (one time)
 
@@ -29,6 +31,13 @@
 4. Open **YouTube Live**, search something and hit ▶.
 
 Default hotkeys: **F9** play/pause, **F10** stop, **F11** pause. You can change them in Settings.
+
+### Game can't hear you, or the mic is noisy?
+
+1. Settings → **Open Windows sound settings**.
+2. Playback tab → CABLE Input → Properties → Advanced: **2 channel, 16 bit, 48000 Hz**, untick both *Exclusive mode* boxes. Do the same for **CABLE Output** on the Recording tab.
+3. Recording tab → right-click CABLE Output → **Set as Default Communication Device**. Restart the game.
+4. In the app (Settings → Your mic) raise the **noise gate** until the meter says *gated* when you're quiet.
 
 ## Build it yourself
 

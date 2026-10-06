@@ -147,15 +147,23 @@ namespace BoomBx.Services
 
         /// <summary>
         /// Pulls the audio of a video into memory (never to disk) and opens a decoder on it.
-        /// Blocking - call from a background thread. Tries the main engine first, then yt-dlp.
+        /// Blocking - call from a background thread.
         /// </summary>
         public WaveStream OpenAudio(string videoId, Action<double>? progress, CancellationToken ct)
+            => OpenDecoder(GetAudioBytes(videoId, progress, ct));
+
+        /// <summary>
+        /// The raw audio file of a video (usually m4a), from RAM cache or downloaded into memory.
+        /// Tries the main engine first, then yt-dlp. Only returns data Windows can decode.
+        /// Blocking - call from a background thread.
+        /// </summary>
+        public byte[] GetAudioBytes(string videoId, Action<double>? progress, CancellationToken ct)
         {
             var cached = GetCached(videoId);
             if (cached != null)
             {
                 progress?.Invoke(1);
-                return OpenDecoder(cached);
+                return cached;
             }
 
             var errors = new List<string>();
@@ -164,11 +172,10 @@ namespace BoomBx.Services
             try
             {
                 var bytes = DownloadWithYoutubeExplode(videoId, progress, ct);
-                var reader = TryOpenDecoder(bytes, errors, "main");
-                if (reader != null)
+                if (CanDecode(bytes, errors, "main"))
                 {
                     AddToCache(videoId, bytes);
-                    return reader;
+                    return bytes;
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
@@ -179,15 +186,14 @@ namespace BoomBx.Services
                 Log?.Invoke("Main engine failed, trying backup...");
             }
 
-            // 2) yt-dlp backup (streams the file to us through stdout, still nothing saved)
+            // 2) yt-dlp backup (sends the file to us through stdout, still nothing saved)
             try
             {
                 var bytes = DownloadWithYtDlp(videoId, progress, ct);
-                var reader = TryOpenDecoder(bytes, errors, "backup");
-                if (reader != null)
+                if (CanDecode(bytes, errors, "backup"))
                 {
                     AddToCache(videoId, bytes);
-                    return reader;
+                    return bytes;
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
@@ -278,22 +284,23 @@ namespace BoomBx.Services
             return memory.ToArray();
         }
 
-        private static WaveStream? TryOpenDecoder(byte[] bytes, List<string> errors, string engine)
+        private static bool CanDecode(byte[] bytes, List<string> errors, string engine)
         {
             try
             {
-                return OpenDecoder(bytes);
+                using var reader = OpenDecoder(bytes);
+                return true;
             }
             catch (Exception ex)
             {
                 errors.Add($"{engine} decode: {ex.Message}");
                 Logger.Log($"[YouTube] decode failed ({engine}): {ex}");
-                return null;
+                return false;
             }
         }
 
         /// <summary>Windows Media Foundation decoder over in-memory audio.</summary>
-        private static WaveStream OpenDecoder(byte[] bytes)
+        public static WaveStream OpenDecoder(byte[] bytes)
         {
             var reader = new StreamMediaFoundationReader(new MemoryStream(bytes, writable: false), ReaderSettings);
             if (reader.WaveFormat == null || reader.WaveFormat.SampleRate <= 0)

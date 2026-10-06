@@ -23,6 +23,40 @@ namespace BoomBx.Services
         private WasapiCapture? _micCapture;
         private IWavePlayer? _persistentOutput;
         private MixingSampleProvider? _persistentMixer;
+        private VolumeSampleProvider? _micVolume;
+        private float _micLevel = 1f;
+        private BufferedWaveProvider? _micBuffer;
+        private byte[] _micTrash = Array.Empty<byte>();
+
+        /// <summary>
+        /// Everything is mixed at 48 kHz stereo - what VB-Cable, Discord and games use -
+        /// so there's less resampling (= less noise and crackle).
+        /// </summary>
+        public static readonly WaveFormat MixFormat = WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
+
+        /// <summary>Mic cleanup (high-pass + noise gate). Null until devices start.</summary>
+        public MicCleanupSampleProvider? MicCleanup { get; private set; }
+
+        private bool _gateEnabled = true;
+        private float _gateThresholdDb = -45f;
+
+        public void SetNoiseGate(bool enabled, float thresholdDb)
+        {
+            _gateEnabled = enabled;
+            _gateThresholdDb = thresholdDb;
+            if (MicCleanup != null)
+            {
+                MicCleanup.GateEnabled = enabled;
+                MicCleanup.ThresholdDb = thresholdDb;
+            }
+        }
+
+        /// <summary>Your real mic level in the virtual mic (0 = muted, 1 = normal, 1.5 = boosted).</summary>
+        public void SetMicLevel(float level)
+        {
+            _micLevel = Math.Clamp(level, 0f, 2f);
+            if (_micVolume != null) _micVolume.Volume = _micLevel;
+        }
                 
         public bool IsUsingVirtualOutput => 
         _deviceManager.SelectedPlaybackDevice?.FriendlyName?.Contains("CABLE Input") == true;
@@ -112,7 +146,7 @@ namespace BoomBx.Services
             {
                 StopPersistentAudioRouting();
 
-                var targetFormat = WaveFormat.CreateIeeeFloatWaveFormat(44100, 2);
+                var targetFormat = MixFormat;
                 _persistentMixer = new MixingSampleProvider(targetFormat)
                 {
                     ReadFully = true
@@ -121,9 +155,26 @@ namespace BoomBx.Services
 
                 _micCapture = new WasapiCapture(_deviceManager.SelectedCaptureDevice);
                 _micCapture.RecordingStopped += HandleCaptureError;
-                var micProvider = new WaveInProvider(_micCapture);
-                var micSampleProvider = ConvertFormat(micProvider.ToSampleProvider(), targetFormat);
-                _persistentMixer.AddMixerInput(micSampleProvider);
+                // Small buffer that never grows: keeps your voice in sync (no slowly rising delay,
+                // no "buffer full" crash after long sessions when mic and cable clocks drift).
+                var capture = _micCapture;
+                var micBuffer = new BufferedWaveProvider(capture.WaveFormat)
+                {
+                    BufferDuration = TimeSpan.FromSeconds(1),
+                    DiscardOnBufferOverflow = true,
+                    ReadFully = true
+                };
+                _micBuffer = micBuffer;
+                capture.DataAvailable += (_, a) => OnMicData(micBuffer, a);
+
+                var micSampleProvider = ConvertFormat(micBuffer.ToSampleProvider(), targetFormat);
+                MicCleanup = new MicCleanupSampleProvider(micSampleProvider)
+                {
+                    GateEnabled = _gateEnabled,
+                    ThresholdDb = _gateThresholdDb
+                };
+                _micVolume = new VolumeSampleProvider(MicCleanup) { Volume = _micLevel };
+                _persistentMixer.AddMixerInput(_micVolume);
 
                 _persistentOutput = new WasapiOut(
                     _deviceManager.SelectedPlaybackDevice,
@@ -140,6 +191,23 @@ namespace BoomBx.Services
             catch (Exception ex)
             {
                 Console.WriteLine($"Error starting persistent routing: {ex}");
+            }
+        }
+
+        private void OnMicData(BufferedWaveProvider buffer, WaveInEventArgs a)
+        {
+            buffer.AddSamples(a.Buffer, 0, a.BytesRecorded);
+
+            // If more than ~150 ms piles up, drop the oldest part so the delay stays low.
+            var format = buffer.WaveFormat;
+            int maxBytes = format.AverageBytesPerSecond * 150 / 1000;
+            int keepBytes = format.AverageBytesPerSecond * 60 / 1000;
+            int extra = buffer.BufferedBytes - keepBytes;
+            if (buffer.BufferedBytes > maxBytes && extra > 0)
+            {
+                extra -= extra % format.BlockAlign;
+                if (_micTrash.Length < extra) _micTrash = new byte[extra];
+                buffer.Read(_micTrash, 0, extra);
             }
         }
 

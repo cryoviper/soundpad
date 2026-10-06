@@ -53,7 +53,7 @@ namespace BoomBx.Services
             get
             {
                 var buffered = _speaker.BufferedSamples / (double)(_format.SampleRate * _format.Channels);
-                return Math.Max(_startSeconds, Volatile.Read(ref _decodedSeconds) - buffered);
+                return Math.Max(0, Volatile.Read(ref _decodedSeconds) - buffered);
             }
         }
 
@@ -117,8 +117,11 @@ namespace BoomBx.Services
 
                 while (!ct.IsCancellationRequested)
                 {
+                    if (ApplySeek(reader, ref position)) writtenSinceRestart = 0;
+
                     WaitForRoom(chunk, ct);
                     if (ct.IsCancellationRequested) break;
+                    if (Interlocked.Read(ref _seekMs) >= 0) continue; // a seek came in while waiting
 
                     int read = samples.Read(buffer, 0, chunk);
                     bool reachedEnd = read == 0;
@@ -154,7 +157,17 @@ namespace BoomBx.Services
                         writtenSinceRestart = 0;
                         continue;
                     }
-                    break;
+
+                    // Finished decoding. Keep the thread alive until the audio has played out,
+                    // so a seek (dragging the bar back) still works.
+                    bool seekedBack = false;
+                    while (!ct.IsCancellationRequested)
+                    {
+                        if (Interlocked.Read(ref _seekMs) >= 0) { seekedBack = true; break; }
+                        if (_speaker.BufferedSamples == 0 && _virtual.BufferedSamples == 0) break;
+                        Thread.Sleep(20);
+                    }
+                    if (!seekedBack) break;
                 }
             }
             catch (OperationCanceledException) { }
@@ -171,12 +184,37 @@ namespace BoomBx.Services
             }
         }
 
+        /// <summary>Jump to a time in the video (thread-safe, applied by the decode thread).</summary>
+        public void Seek(double seconds)
+        {
+            Interlocked.Exchange(ref _seekMs, (long)(Math.Max(0, seconds) * 1000));
+        }
+
+        private long _seekMs = -1;
+
+        private bool ApplySeek(WaveStream reader, ref double position)
+        {
+            long ms = Interlocked.Exchange(ref _seekMs, -1);
+            if (ms < 0) return false;
+
+            double target = ms / 1000.0;
+            if (TotalSeconds > 0) target = Math.Min(target, Math.Max(0, TotalSeconds - 0.05));
+
+            reader.CurrentTime = TimeSpan.FromSeconds(target);
+            position = target;
+            _virtual.Discard(int.MaxValue);
+            _speaker.Discard(int.MaxValue);
+            Volatile.Write(ref _decodedSeconds, target);
+            return true;
+        }
+
         /// <summary>Waits until both outputs have room. Never blocks forever unless paused.</summary>
         private void WaitForRoom(int needed, CancellationToken ct)
         {
             var stuck = Stopwatch.StartNew();
             while (!ct.IsCancellationRequested && (_virtual.FreeSamples < needed || _speaker.FreeSamples < needed))
             {
+                if (Interlocked.Read(ref _seekMs) >= 0) return;
                 if (_paused)
                 {
                     stuck.Restart();

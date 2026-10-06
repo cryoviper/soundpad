@@ -32,6 +32,20 @@ namespace BoomBx.Views
         private YouTubeAudioSource? _ytSource;
         private SoundItem? _playingSound;          // what is playing right now
         private SoundItem? _extraSoundSubscription; // a sound we listen to that isn't SelectedSound
+        private double _currentSoundVolume = 100;   // per-sound volume of what's playing (0-100)
+
+        /// <summary>
+        /// Final volume = sound volume x master volume.
+        /// Friends (virtual mic) and you (speakers) each have their own master.
+        /// </summary>
+        private void ApplyVolumes()
+        {
+            float sound = (float)(_currentSoundVolume / 100.0);
+            if (_volumeProviderVirtual != null)
+                _volumeProviderVirtual.Volume = sound * (float)(ViewModel.MasterVirtualVolume / 100.0);
+            if (_volumeProviderSpeaker != null)
+                _volumeProviderSpeaker.Volume = sound * (float)(ViewModel.MasterSpeakerVolume / 100.0);
+        }
 
 
         private enum PlaybackState { Stopped, Playing, Paused }
@@ -110,8 +124,8 @@ namespace BoomBx.Views
                 switch (e.PropertyName)
                 {
                     case nameof(SoundItem.Volume):
-                        _volumeProviderVirtual.Volume = (float)soundItem.Volume / 100;
-                        _volumeProviderSpeaker.Volume = (float)soundItem.Volume / 100;
+                        _currentSoundVolume = soundItem.Volume;
+                        ApplyVolumes();
                         break;
 
                     case nameof(SoundItem.Bass):
@@ -193,7 +207,7 @@ namespace BoomBx.Views
                     return;
                 }
 
-                var targetFormat = WaveFormat.CreateIeeeFloatWaveFormat(44100, 2);
+                var targetFormat = AudioService.MixFormat;
                 float initialVolume = (float)(sound.Volume / 100.0);
 
                 ISampleProvider virtualSource;
@@ -270,6 +284,8 @@ namespace BoomBx.Views
                 _equalizerSpeaker = speakerChain.Value.Eq;
                 _pitchShifterSpeaker = speakerChain.Value.Pitch;
                 _volumeProviderSpeaker = speakerChain.Value.Volume;
+                _currentSoundVolume = sound.Volume;
+                ApplyVolumes();
 
                 // Live volume/EQ/pitch updates for sounds that aren't the selected one.
                 if (sound != ViewModel.SelectedSound)
@@ -463,12 +479,8 @@ namespace BoomBx.Views
         {
             try
             {
-                WaveStream reader = Path.GetExtension(filePath).ToLower() switch
-                {
-                    ".mp3" => new Mp3FileReader(filePath),
-                    ".wav" => new WaveFileReader(filePath),
-                    _ => throw new InvalidOperationException("Unsupported file format")
-                };
+                // AudioFileReader handles mp3/wav/aiff itself and m4a/aac/flac/wma through Windows.
+                WaveStream reader = new AudioFileReader(filePath);
                 if (reader.WaveFormat == null ||
                     reader.WaveFormat.Channels <= 0 ||
                     reader.WaveFormat.SampleRate <= 0)

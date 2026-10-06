@@ -14,16 +14,31 @@ namespace BoomBx.Services
             Directory.CreateDirectory(AppDataDir);
             var path = Path.Combine(AppDataDir, "settings.json");
             
-            return File.Exists(path) 
-                ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new AppSettings()
-                : new AppSettings();
+            try
+            {
+                return File.Exists(path)
+                    ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new AppSettings()
+                    : new AppSettings();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Settings file broken, using defaults: {ex.Message}");
+                return new AppSettings();
+            }
         }
 
         public static void SaveSettings(AppSettings settings)
         {
             Directory.CreateDirectory(AppDataDir);
             var path = Path.Combine(AppDataDir, "settings.json");
-            File.WriteAllText(path, JsonSerializer.Serialize(settings));
+            try
+            {
+                File.WriteAllText(path, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Couldn't save settings: {ex.Message}");
+            }
         }
     }
 }

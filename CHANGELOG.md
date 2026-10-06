@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/)
 
+## [0.3.0]
+### Added
+- YouTube: drag-to-seek bar, "Cut a clip" (mark start/end while playing, preview), Save as MP3 (trimmed) to a folder + auto-add to board, recently played list, Hindi meme quick-searches
+- Text to Speech rebuilt: natural Microsoft neural voices, Hindi (Swara / Madhur) + 100+ languages, language + voice picker, speed/pitch, recent phrases, Ctrl+Enter to speak; eSpeak kept as offline backup
+- Per-sound hotkeys (press once to play, again to stop), right-click menu on sounds, search inside a board, drag & drop files or folders, M4A/AAC/FLAC/WMA/AIFF support
+- Mixer: separate "friends hear" and "you hear" volume, mic volume + mute
+- Mic cleanup for games: noise gate + rumble filter with a live level meter
+- VB-Cable help card with a button to open Windows sound settings
+
+### Fixed
+- Noisy, too-loud mic on laptops with mic arrays (4-channel downmix bug overran the audio buffer)
+- Mic delay slowly growing / "buffer full" errors in long sessions (mic buffer now capped at ~150 ms)
+- Everything now mixes at 48 kHz (what VB-Cable, Discord and games use) - less resampling, less crackle
+- Settings could be overwritten by an old copy (shared settings object)
+
 ## [0.2.2]
 ### Fixed
 - "Speaker output error: Source array type cannot be assigned..." when playing YouTube clips
