@@ -85,10 +85,11 @@ namespace BoomBx.Views
                     r.IsPlaying = ViewModel.YtNowPlaying?.Id == r.Id && _ytSource != null;
                     ViewModel.YtResults.Add(r);
                 }
+                ViewModel.YtHasResults = results.Count > 0;
 
                 ViewModel.YtStatus = results.Count == 0
                     ? "No results. Try other words."
-                    : $"{results.Count} results. Hit ▶ to play live, ⭐ to pin to your soundboard.";
+                    : $"{results.Count} results";
 
                 _ = LoadThumbnailsAsync(results, cts.Token);
             }
@@ -98,7 +99,8 @@ namespace BoomBx.Views
             }
             catch (Exception ex)
             {
-                ViewModel.YtStatus = $"❌ Search failed: {ex.Message}";
+                Logger.Log($"[YouTube] search failed: {ex}");
+                ViewModel.YtStatus = $"Search failed: {ex.Message}";
             }
             finally
             {
@@ -141,6 +143,14 @@ namespace BoomBx.Views
             else if (button.Classes.Contains("yt-pin")) await PinToSoundboardAsync(result);
         }
 
+        /// <summary>Quick-search chips on the empty screen.</summary>
+        private async void YtChip_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: string query }) return;
+            ViewModel.YtQuery = query;
+            await RunYouTubeSearchAsync();
+        }
+
         private void PlayOrToggle(YouTubeResult result)
         {
 
@@ -179,9 +189,11 @@ namespace BoomBx.Views
 
             ViewModel.YtNowPlaying = result;
             ViewModel.YtNowPlayingTitle = result.Title;
-            ViewModel.YtProgressText = "Buffering...";
+            ViewModel.YtElapsedText = TimeText.Format(start);
+            ViewModel.YtTotalText = result.DurationText;
             ViewModel.YtProgress = 0;
-            ViewModel.YtStatus = $"Loading \"{result.Title}\"...";
+            ViewModel.YtIsLoading = true;
+            ViewModel.YtStatus = "Loading...";
             foreach (var r in ViewModel.YtResults) r.IsPlaying = r == result;
         }
 
@@ -214,8 +226,12 @@ namespace BoomBx.Views
             void Reset()
             {
                 foreach (var r in ViewModel.YtResults) r.IsPlaying = false;
-                ViewModel.YtProgressText = "";
+                ViewModel.YtElapsedText = "0:00";
                 ViewModel.YtProgress = 0;
+                ViewModel.YtIsLoading = false;
+                ViewModel.YtIsPlaying = false;
+                if (ViewModel.YtStatus is "Loading..." or "Playing in your mic" || ViewModel.YtStatus.StartsWith("Loading "))
+                    ViewModel.YtStatus = "";
             }
 
             if (Dispatcher.UIThread.CheckAccess()) Reset();
@@ -226,29 +242,46 @@ namespace BoomBx.Views
         {
             var source = _ytSource;
             if (source == null) return;
+            bool isTabSound = _playingSound == ViewModel.YtCurrentSound;
 
-            // First audio arrived -> tell the user it's live.
-            if (!source.IsBuffering && _ytAnnouncedSource != source)
+            // Safety net: the speaker output stopped asking for audio (device error) -> stop instead of hanging.
+            if (_currentPlaybackState == PlaybackState.Playing && source.MsSinceSpeakerRead > 4000)
             {
-                _ytAnnouncedSource = source;
-                UpdateStatus($"🎵 Playing {_playingSound?.Name}");
-                if (_playingSound == ViewModel.YtCurrentSound)
-                    ViewModel.YtStatus = "🔴 Live in your mic. Friends can hear it now.";
-            }
-
-            if (_playingSound != ViewModel.YtCurrentSound) return;
-
-            if (source.IsBuffering)
-            {
-                ViewModel.YtProgressText = "Buffering...";
+                Logger.Log("[YouTube] speaker output stopped reading - stopping playback");
+                StopAudioProcessing(updateStatus: false);
+                UpdateStatus("Audio output stopped. Check the playback device in Settings.", true);
+                if (isTabSound) ViewModel.YtStatus = "Audio output stopped. Check the playback device in Settings.";
                 return;
             }
 
+            if (source.IsBuffering)
+            {
+                if (isTabSound)
+                {
+                    var pct = (int)Math.Round(source.LoadProgress * 100);
+                    ViewModel.YtStatus = pct > 0 && pct < 100 ? $"Loading {pct}%" : "Loading...";
+                }
+                return;
+            }
+
+            // First audio arrived -> tell the user it's live.
+            if (_ytAnnouncedSource != source)
+            {
+                _ytAnnouncedSource = source;
+                UpdateStatus($"Playing {_playingSound?.Name}");
+                if (isTabSound)
+                {
+                    ViewModel.YtIsLoading = false;
+                    ViewModel.YtStatus = "Playing in your mic";
+                }
+            }
+
+            if (!isTabSound) return;
+
             var total = source.TotalSeconds;
             var elapsed = source.ElapsedSeconds;
-            ViewModel.YtProgressText = total > 0
-                ? $"{TimeText.Format(elapsed)} / {TimeText.Format(total)}"
-                : TimeText.Format(elapsed);
+            ViewModel.YtElapsedText = TimeText.Format(elapsed);
+            if (total > 0) ViewModel.YtTotalText = TimeText.Format(total);
             ViewModel.YtProgress = total > 0 ? Math.Clamp(elapsed / total * 100, 0, 100) : 0;
         }
 
@@ -302,7 +335,7 @@ namespace BoomBx.Views
             sound.PropertyChanged += SoundItem_PropertyChanged;
             board.Sounds.Add(sound);
             SaveSoundLibrary();
-            ViewModel.YtStatus = $"⭐ Pinned to \"{board.Name}\". Hotkeys work on it too.";
+            ViewModel.YtStatus = $"Pinned to \"{board.Name}\". Hotkeys work on it too.";
         }
 
         /// <summary>Start/End boxes for pinned YouTube clips: apply when the box loses focus.</summary>

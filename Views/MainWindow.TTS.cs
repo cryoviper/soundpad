@@ -115,7 +115,7 @@ namespace BoomBx.Views
 
                         vm.SelectedSoundboard?.Sounds.Add(newItem);
                         SaveSoundLibrary();
-                        UpdateStatus("💾 TTS audio saved to soundboard!");
+                        UpdateStatus("TTS audio saved to soundboard!");
                     }
                 }
             }
@@ -186,7 +186,7 @@ namespace BoomBx.Views
                 InitializeSpeakerOutput();
 
                 _currentPlaybackState = PlaybackState.Playing;
-                UpdateStatus($"🗣️ Playing TTS: {((MainWindowViewModel)DataContext).TtsText.TrimTo(20)}");
+                UpdateStatus($"Playing TTS: {((MainWindowViewModel)DataContext).TtsText.TrimTo(20)}");
             }
             catch (Exception ex)
             {

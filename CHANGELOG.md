@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/)
 
+## [0.2.1]
+### Fixed
+- YouTube clips getting stuck at 0:00 with no sound: audio is now pulled into memory first (still never saved to disk), then played
+- Clear error message instead of a silent hang if YouTube or the audio device fails
+- Broken square icons (emoji) replaced with proper vector icons
+
+### Changed
+- Full UI redesign: new dark theme with pink accent, cleaner sidebar, sound tiles, YouTube player card, quick-search chips, proper status bar
+- Selected-sound panel only shows on the Sounds tab
+- Recently played YouTube clips are kept in memory so they replay instantly
+
 ## [0.2.0] - Boobies Soundpad
 ### Added
 - YouTube Live tab: search YouTube (or paste a link) and stream audio live into the virtual mic + speakers, no downloads

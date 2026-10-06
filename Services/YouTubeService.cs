@@ -139,74 +139,242 @@ namespace BoomBx.Services
 
         // ------------------------------------------------------------------ audio
 
+        // Recently played clips stay in RAM so replays / pinned sounds start instantly.
+        private const long CacheLimitBytes = 150L * 1024 * 1024;
+        private readonly object _cacheLock = new();
+        private readonly LinkedList<(string Id, byte[] Data)> _cache = new();
+        private long _cacheBytes;
+
         /// <summary>
-        /// Opens a decodable audio stream for a video. Blocking - call it from a background thread.
-        /// Tries 3 ways, fastest first.
+        /// Pulls the audio of a video into memory (never to disk) and opens a decoder on it.
+        /// Blocking - call from a background thread. Tries the main engine first, then yt-dlp.
         /// </summary>
-        public WaveStream OpenAudio(string videoId, CancellationToken ct)
+        public WaveStream OpenAudio(string videoId, Action<double>? progress, CancellationToken ct)
         {
-            Exception? lastError = null;
+            var cached = GetCached(videoId);
+            if (cached != null)
+            {
+                progress?.Invoke(1);
+                return OpenDecoder(cached);
+            }
 
-            // 1) YoutubeExplode stream, decoded by Windows Media Foundation (AAC/m4a).
-            string? directUrl = null;
+            var errors = new List<string>();
+
+            // 1) YoutubeExplode
             try
             {
-                var manifest = _client.Videos.Streams.GetManifestAsync(VideoId.Parse(videoId), ct)
-                    .AsTask().GetAwaiter().GetResult();
-
-                var audio = manifest.GetAudioOnlyStreams()
-                    .OrderByDescending(s => s.Container.Name.Equals("mp4", StringComparison.OrdinalIgnoreCase))
-                    .ThenByDescending(s => s.Bitrate.BitsPerSecond)
-                    .FirstOrDefault()
-                    ?? throw new InvalidOperationException("No audio stream found for this video");
-
-                directUrl = audio.Url;
-
-                var stream = _client.Videos.Streams.GetAsync(audio, ct).AsTask().GetAwaiter().GetResult();
-                return new StreamMediaFoundationReader(stream, ReaderSettings);
+                var bytes = DownloadWithYoutubeExplode(videoId, progress, ct);
+                var reader = TryOpenDecoder(bytes, errors, "main");
+                if (reader != null)
+                {
+                    AddToCache(videoId, bytes);
+                    return reader;
+                }
             }
-            catch (OperationCanceledException) { throw; }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
-                lastError = ex;
-                Log?.Invoke($"Stream method 1 failed: {ex.Message}");
+                errors.Add($"main: {ex.Message}");
+                Logger.Log($"[YouTube] main engine failed for {videoId}: {ex}");
+                Log?.Invoke("Main engine failed, trying backup...");
             }
 
-            // 2) Let Media Foundation stream the URL by itself.
-            if (directUrl != null)
-            {
-                try
-                {
-                    return new MediaFoundationReader(directUrl, ReaderSettings);
-                }
-                catch (Exception ex)
-                {
-                    lastError = ex;
-                    Log?.Invoke($"Stream method 2 failed: {ex.Message}");
-                }
-            }
-
-            // 3) Backup: ask yt-dlp for a playable URL.
+            // 2) yt-dlp backup (streams the file to us through stdout, still nothing saved)
             try
             {
-                ct.ThrowIfCancellationRequested();
-                var exe = EnsureYtDlpAsync(ct).GetAwaiter().GetResult();
-                var lines = RunYtDlpAsync(exe, ct,
-                        "-f", "bestaudio[ext=m4a]/bestaudio", "-g", "--no-playlist", "--no-warnings",
-                        $"https://www.youtube.com/watch?v={videoId}")
-                    .GetAwaiter().GetResult();
-
-                var url = lines.FirstOrDefault(l => l.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-                          ?? throw new InvalidOperationException("yt-dlp returned no URL");
-                return new MediaFoundationReader(url, ReaderSettings);
+                var bytes = DownloadWithYtDlp(videoId, progress, ct);
+                var reader = TryOpenDecoder(bytes, errors, "backup");
+                if (reader != null)
+                {
+                    AddToCache(videoId, bytes);
+                    return reader;
+                }
             }
-            catch (OperationCanceledException) { throw; }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
-                lastError = ex;
+                errors.Add($"backup: {ex.Message}");
+                Logger.Log($"[YouTube] backup engine failed for {videoId}: {ex}");
             }
 
-            throw new InvalidOperationException($"Couldn't play this video: {lastError?.Message}", lastError);
+            throw new InvalidOperationException("Couldn't play this video. " + string.Join(" | ", errors));
+        }
+
+        private byte[] DownloadWithYoutubeExplode(string videoId, Action<double>? progress, CancellationToken ct)
+        {
+            using var watchdog = new StallWatchdog(ct, TimeSpan.FromSeconds(20));
+
+            var manifest = _client.Videos.Streams.GetManifestAsync(VideoId.Parse(videoId), watchdog.Token)
+                .AsTask().GetAwaiter().GetResult();
+
+            // m4a (AAC) first - Windows decodes it natively.
+            var audio = manifest.GetAudioOnlyStreams()
+                .OrderByDescending(s => s.Container.Name.Equals("mp4", StringComparison.OrdinalIgnoreCase))
+                .ThenByDescending(s => s.Bitrate.BitsPerSecond)
+                .FirstOrDefault()
+                ?? throw new InvalidOperationException("No audio stream found for this video");
+
+            long size = audio.Size.Bytes;
+            using var memory = new MemoryStream(size > 0 && size < int.MaxValue ? (int)size : 0);
+            var reporter = new SyncProgress(p =>
+            {
+                watchdog.Alive();
+                progress?.Invoke(p);
+            });
+
+            _client.Videos.Streams.CopyToAsync(audio, memory, reporter, watchdog.Token)
+                .AsTask().GetAwaiter().GetResult();
+
+            Logger.Log($"[YouTube] {videoId}: got {memory.Length / 1024} KB ({audio.Container.Name}, {audio.Bitrate})");
+            if (memory.Length == 0) throw new InvalidOperationException("Downloaded 0 bytes");
+            return memory.ToArray();
+        }
+
+        private byte[] DownloadWithYtDlp(string videoId, Action<double>? progress, CancellationToken ct)
+        {
+            var exe = EnsureYtDlpAsync(ct).GetAwaiter().GetResult();
+            Log?.Invoke("Loading with backup engine...");
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = exe,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            foreach (var a in new[]
+                     {
+                         "-f", "bestaudio[ext=m4a]/bestaudio", "--no-playlist", "--no-warnings",
+                         "--no-part", "--quiet", "-o", "-", $"https://www.youtube.com/watch?v={videoId}"
+                     })
+                psi.ArgumentList.Add(a);
+
+            using var process = Process.Start(psi) ?? throw new InvalidOperationException("Couldn't start yt-dlp");
+            using var watchdog = new StallWatchdog(ct, TimeSpan.FromSeconds(25));
+            using var reg = watchdog.Token.Register(() => { try { process.Kill(true); } catch { } });
+
+            var stderrTask = process.StandardError.ReadToEndAsync();
+            using var memory = new MemoryStream();
+            var buffer = new byte[64 * 1024];
+            var output = process.StandardOutput.BaseStream;
+            int read;
+            while ((read = output.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                memory.Write(buffer, 0, read);
+                watchdog.Alive();
+            }
+            process.WaitForExit();
+            watchdog.Token.ThrowIfCancellationRequested();
+
+            if (process.ExitCode != 0 || memory.Length == 0)
+            {
+                var err = stderrTask.GetAwaiter().GetResult().Trim();
+                throw new InvalidOperationException(string.IsNullOrEmpty(err) ? $"yt-dlp exit code {process.ExitCode}" : err);
+            }
+
+            progress?.Invoke(1);
+            Logger.Log($"[YouTube] {videoId}: backup got {memory.Length / 1024} KB");
+            return memory.ToArray();
+        }
+
+        private static WaveStream? TryOpenDecoder(byte[] bytes, List<string> errors, string engine)
+        {
+            try
+            {
+                return OpenDecoder(bytes);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{engine} decode: {ex.Message}");
+                Logger.Log($"[YouTube] decode failed ({engine}): {ex}");
+                return null;
+            }
+        }
+
+        /// <summary>Windows Media Foundation decoder over in-memory audio.</summary>
+        private static WaveStream OpenDecoder(byte[] bytes)
+        {
+            var reader = new StreamMediaFoundationReader(new MemoryStream(bytes, writable: false), ReaderSettings);
+            if (reader.WaveFormat == null || reader.WaveFormat.SampleRate <= 0)
+            {
+                reader.Dispose();
+                throw new InvalidOperationException("Audio format not supported");
+            }
+            return reader;
+        }
+
+        private byte[]? GetCached(string id)
+        {
+            lock (_cacheLock)
+            {
+                var node = _cache.First;
+                while (node != null)
+                {
+                    if (node.Value.Id == id)
+                    {
+                        _cache.Remove(node);
+                        _cache.AddFirst(node);
+                        return node.Value.Data;
+                    }
+                    node = node.Next;
+                }
+                return null;
+            }
+        }
+
+        private void AddToCache(string id, byte[] data)
+        {
+            if (data.LongLength > CacheLimitBytes / 2) return;
+            lock (_cacheLock)
+            {
+                _cache.AddFirst((id, data));
+                _cacheBytes += data.LongLength;
+                while (_cacheBytes > CacheLimitBytes && _cache.Last != null)
+                {
+                    _cacheBytes -= _cache.Last.Value.Data.LongLength;
+                    _cache.RemoveLast();
+                }
+            }
+        }
+
+        /// <summary>Cancels when no progress is reported for a while (stuck network).</summary>
+        private sealed class StallWatchdog : IDisposable
+        {
+            private readonly CancellationTokenSource _cts;
+            private readonly Timer _timer;
+            private readonly TimeSpan _limit;
+            private long _lastAlive = Environment.TickCount64;
+
+            public StallWatchdog(CancellationToken outer, TimeSpan limit)
+            {
+                _limit = limit;
+                _cts = CancellationTokenSource.CreateLinkedTokenSource(outer);
+                _timer = new Timer(_ =>
+                {
+                    if (Environment.TickCount64 - Interlocked.Read(ref _lastAlive) > _limit.TotalMilliseconds)
+                    {
+                        try { _cts.Cancel(); } catch (ObjectDisposedException) { }
+                    }
+                }, null, 1000, 1000);
+            }
+
+            public CancellationToken Token => _cts.Token;
+            public void Alive() => Interlocked.Exchange(ref _lastAlive, Environment.TickCount64);
+
+            public void Dispose()
+            {
+                _timer.Dispose();
+                _cts.Dispose();
+            }
+        }
+
+        /// <summary>IProgress that reports right away on the calling thread.</summary>
+        private sealed class SyncProgress : IProgress<double>
+        {
+            private readonly Action<double> _report;
+            public SyncProgress(Action<double> report) => _report = report;
+            public void Report(double value) => _report(value);
         }
 
         public static async Task<byte[]?> DownloadBytesAsync(string url, CancellationToken ct = default)

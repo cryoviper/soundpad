@@ -76,7 +76,7 @@ namespace BoomBx.Views
             Console.SetOut(new SplashTextWriter());
             Console.WriteLine("[1] MainWindow constructor started");
 
-            this.Styles.Add(new FluentTheme());
+            // FluentTheme is already applied app-wide in App.axaml (adding it here again overrode our styles).
 
             InitializeComponent();
 

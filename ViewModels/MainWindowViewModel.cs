@@ -87,7 +87,7 @@ namespace BoomBx.ViewModels
         private bool _ytIsSearching;
 
         [ObservableProperty]
-        private string _ytStatus = "Search anything - it plays live into your mic. Nothing gets downloaded.";
+        private string _ytStatus = "";
 
         public ObservableCollection<YouTubeResult> YtResults { get; } = new();
 
@@ -99,13 +99,24 @@ namespace BoomBx.ViewModels
         private string _ytNowPlayingTitle = "";
 
         [ObservableProperty]
-        private string _ytProgressText = "";
+        private string _ytElapsedText = "0:00";
+
+        [ObservableProperty]
+        private string _ytTotalText = "0:00";
+
+        /// <summary>True while the clip is loading (before sound starts).</summary>
+        [ObservableProperty]
+        private bool _ytIsLoading;
+
+        [ObservableProperty]
+        private bool _ytHasResults;
 
         [ObservableProperty]
         private double _ytProgress;
 
+        /// <summary>True = show the pause icon, false = show play.</summary>
         [ObservableProperty]
-        private string _ytPlayPauseText = "⏸";
+        private bool _ytIsPlaying;
 
         [ObservableProperty]
         private double _ytVolume = 80;

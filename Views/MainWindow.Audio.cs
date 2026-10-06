@@ -128,7 +128,7 @@ namespace BoomBx.Views
             }
             catch (Exception ex)
             {
-                UpdateStatus($"⚠️ Update failed: {ex.Message}");
+                UpdateStatus($"Update failed: {ex.Message}");
             }
         }
 
@@ -171,7 +171,7 @@ namespace BoomBx.Views
             }
             catch (Exception ex)
             {
-                UpdateStatus($"🔈 Speaker error: {ex.Message}");
+                UpdateStatus($"Speaker error: {ex.Message}");
                 StopAudioProcessing(updateStatus: false);
             }
         }
@@ -189,7 +189,7 @@ namespace BoomBx.Views
                 var sound = soundOverride ?? ViewModel.SelectedSound;
                 if (sound == null)
                 {
-                    UpdateStatus("🔇 No sound selected");
+                    UpdateStatus("No sound selected");
                     return;
                 }
 
@@ -209,8 +209,8 @@ namespace BoomBx.Views
                     {
                         if (_ytSource != source) return;
                         StopAudioProcessing(updateStatus: false);
-                        UpdateStatus($"❌ {message}", true);
-                        ViewModel.YtStatus = $"❌ {message}";
+                        UpdateStatus($"{message}", true);
+                        ViewModel.YtStatus = $"{message}";
                     });
 
                     _ytSource = source;
@@ -221,7 +221,7 @@ namespace BoomBx.Views
                 {
                     if (string.IsNullOrWhiteSpace(sound.Path) || !File.Exists(sound.Path))
                     {
-                        UpdateStatus("❌ Invalid audio file path");
+                        UpdateStatus("Invalid audio file path");
                         return;
                     }
 
@@ -230,7 +230,7 @@ namespace BoomBx.Views
 
                     if (tempVirtualStream == null || tempSpeakerStream == null)
                     {
-                        UpdateStatus("⚠️ Failed to initialize audio streams");
+                        UpdateStatus("Failed to initialize audio streams");
                         tempVirtualStream?.Dispose();
                         tempSpeakerStream?.Dispose();
                         return;
@@ -238,7 +238,7 @@ namespace BoomBx.Views
 
                     if (tempVirtualStream.WaveFormat == null || tempSpeakerStream.WaveFormat == null)
                     {
-                        UpdateStatus("⚠️ Audio stream has invalid format");
+                        UpdateStatus("Audio stream has invalid format");
                         tempVirtualStream.Dispose();
                         tempSpeakerStream.Dispose();
                         return;
@@ -258,7 +258,7 @@ namespace BoomBx.Views
 
                 if (virtualChain?.Volume == null || speakerChain?.Volume == null)
                 {
-                    UpdateStatus("⚠️ Failed to create processing chain");
+                    UpdateStatus("Failed to create processing chain");
                     StopAudioProcessing(updateStatus: false);
                     return;
                 }
@@ -286,11 +286,11 @@ namespace BoomBx.Views
                 _ytSource?.Start();
 
                 _currentPlaybackState = PlaybackState.Playing;
-                UpdateStatus(sound.IsYouTube ? $"⏳ Loading {sound.Name}..." : $"🎵 Playing {sound.Name}");
+                UpdateStatus(sound.IsYouTube ? $"Loading {sound.Name}..." : $"Playing {sound.Name}");
             }
             catch (Exception ex)
             {
-                UpdateStatus($"⛔ Error: {ex.Message}");
+                UpdateStatus($"Error: {ex.Message}");
                 StopAudioProcessing(updateStatus: false);
             }
             finally
@@ -305,7 +305,7 @@ namespace BoomBx.Views
         {
             if (stream?.WaveFormat == null)
             {
-                UpdateStatus("⚠️ Processing chain error: stream has no WaveFormat");
+                UpdateStatus("Processing chain error: stream has no WaveFormat");
                 return null;
             }
             return CreateProcessingChain(stream.ToSampleProvider(), format, sound, volume);
@@ -332,7 +332,7 @@ namespace BoomBx.Views
             }
             catch (Exception ex)
             {
-                UpdateStatus($"⚠️ Processing chain error: {ex.Message} (Type: {ex.GetType().Name})");
+                UpdateStatus($"Processing chain error: {ex.Message} (Type: {ex.GetType().Name})");
                 return null;
             }
         }
@@ -341,10 +341,18 @@ namespace BoomBx.Views
         {
             Dispatcher.UIThread.Post(() =>
             {
-                if (_currentPlaybackState == PlaybackState.Playing && args.Exception == null)
+                if (_currentPlaybackState != PlaybackState.Playing) return;
+
+                StopAudioProcessing(updateStatus: false);
+                UpdatePlayPauseButtonState();
+
+                if (args.Exception != null)
                 {
-                    StopAudioProcessing();
-                    UpdatePlayPauseButtonState();
+                    Logger.Log($"Speaker output stopped with error: {args.Exception}");
+                    UpdateStatus($"Speaker output error: {args.Exception.Message}", true);
+                }
+                else
+                {
                     UpdateStatus("Playback completed");
                 }
             });
@@ -420,11 +428,11 @@ namespace BoomBx.Views
                 _virtualLoopStream = null;
                 _speakerLoopStream = null;
 
-                if (updateStatus) UpdateStatus("⏹ Playback stopped");
+                if (updateStatus) UpdateStatus("Playback stopped");
             }
             catch (Exception ex)
             {
-                UpdateStatus($"⚠️ Stop error: {ex.Message}");
+                UpdateStatus($"Stop error: {ex.Message}");
             }
             finally
             {
@@ -436,16 +444,18 @@ namespace BoomBx.Views
         {
             Dispatcher.UIThread.Post(() =>
             {
-                PlayPauseButton.Content = _currentPlaybackState switch
+                PlayPauseButtonText.Text = _currentPlaybackState switch
                 {
-                    PlaybackState.Playing => "⏸ Pause",
-                    PlaybackState.Paused => "▶ Resume",
-                    _ => "▶ Play"
+                    PlaybackState.Playing => "Pause",
+                    PlaybackState.Paused => "Resume",
+                    _ => "Play"
                 };
+                PlayIcon.IsVisible = _currentPlaybackState != PlaybackState.Playing;
+                PauseIcon.IsVisible = _currentPlaybackState == PlaybackState.Playing;
 
-                StopButton.IsVisible = _currentPlaybackState != PlaybackState.Stopped;
+                StopButton.IsEnabled = _currentPlaybackState != PlaybackState.Stopped;
 
-                ViewModel.YtPlayPauseText = _currentPlaybackState == PlaybackState.Playing ? "⏸" : "▶";
+                ViewModel.YtIsPlaying = _currentPlaybackState == PlaybackState.Playing;
             });
         }
 

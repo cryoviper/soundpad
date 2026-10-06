@@ -34,7 +34,15 @@ namespace BoomBx.Services
         public ISampleProvider SpeakerOutput => _speaker;
 
         public bool Loop { get => _loop; set => _loop = value; }
-        public bool Paused { get => _paused; set => _paused = value; }
+        public bool Paused
+        {
+            get => _paused;
+            set
+            {
+                _paused = value;
+                if (!value) _speaker.MarkAlive(); // just resumed - don't treat the pause gap as a dead output
+            }
+        }
 
         /// <summary>Video length in seconds once known (0 before).</summary>
         public double TotalSeconds { get; private set; }
@@ -50,6 +58,12 @@ namespace BoomBx.Services
         }
 
         public bool IsBuffering => !_speaker.HasStarted;
+
+        /// <summary>0..1 while the audio is being pulled into memory.</summary>
+        public double LoadProgress { get; private set; }
+
+        /// <summary>Milliseconds since the speaker output last asked for audio.</summary>
+        public long MsSinceSpeakerRead => Environment.TickCount64 - _speaker.LastReadTick;
 
         /// <summary>Raised on the decode thread when something breaks.</summary>
         public event Action<string>? Failed;
@@ -84,8 +98,10 @@ namespace BoomBx.Services
             var ct = _cts.Token;
             try
             {
-                using var reader = _service.OpenAudio(_videoId, ct);
+                using var reader = _service.OpenAudio(_videoId, p => LoadProgress = p, ct);
+                LoadProgress = 1;
                 TotalSeconds = reader.TotalTime.TotalSeconds;
+                Logger.Log($"[YouTube] {_videoId}: decoding {reader.WaveFormat} length {reader.TotalTime}");
 
                 if (_startSeconds > 0 && (TotalSeconds <= 0 || _startSeconds < TotalSeconds))
                     reader.CurrentTime = TimeSpan.FromSeconds(_startSeconds);
@@ -144,6 +160,7 @@ namespace BoomBx.Services
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
+                Logger.Log($"[YouTube] {_videoId}: {ex}");
                 if (!ct.IsCancellationRequested)
                     Failed?.Invoke(ex.Message);
             }
@@ -211,6 +228,9 @@ namespace BoomBx.Services
         public int BufferedSamples { get { lock (_lock) return _count; } }
         public int FreeSamples { get { lock (_lock) return _buffer.Length - _count; } }
         public bool HasStarted { get { lock (_lock) return _started; } }
+        public long LastReadTick => Interlocked.Read(ref _lastReadTick);
+        public void MarkAlive() => Interlocked.Exchange(ref _lastReadTick, Environment.TickCount64);
+        private long _lastReadTick = Environment.TickCount64;
 
         public void Write(float[] source, int count)
         {
@@ -253,6 +273,7 @@ namespace BoomBx.Services
 
         public int Read(float[] buffer, int offset, int count)
         {
+            Interlocked.Exchange(ref _lastReadTick, Environment.TickCount64);
             lock (_lock)
             {
                 if (!_started)

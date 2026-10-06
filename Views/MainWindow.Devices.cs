@@ -24,7 +24,7 @@ namespace BoomBx.Views
             }
             catch (Exception ex)
             {
-                UpdateStatus($"🔇 Virtual output error: {ex.Message}");
+                UpdateStatus($"Virtual output error: {ex.Message}");
             }
         }
     }
