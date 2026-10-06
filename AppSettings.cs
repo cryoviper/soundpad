@@ -23,6 +23,14 @@ public class AppSettings
     public bool NoiseGateEnabled { get; set; } = true;
     public double NoiseGateDb { get; set; } = -45;
 
+    // Voice changer
+    public bool VoiceEnabled { get; set; }
+    public string VoicePresetId { get; set; } = "normal";
+    /// <summary>Fine pitch tune in semitones (-6..+6).</summary>
+    public double VoicePitchTune { get; set; }
+    public bool MonitorEnabled { get; set; }
+    public string VoiceToggleHotkey { get; set; } = "F8";
+
     // YouTube
     public string DownloadFolder { get; set; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "Boobies Soundpad");

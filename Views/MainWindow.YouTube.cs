@@ -229,6 +229,7 @@ namespace BoomBx.Views
 
             ViewModel.YtNowPlaying = result;
             ViewModel.YtNowPlayingTitle = result.Title;
+            ViewModel.PlayerThumb = result.Thumbnail;
             ViewModel.YtElapsedText = TimeText.Format(start);
             ViewModel.YtTotalText = result.DurationText;
             ViewModel.YtIsLoading = true;

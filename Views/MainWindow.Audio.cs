@@ -302,6 +302,7 @@ namespace BoomBx.Views
                 _ytSource?.Start();
 
                 _currentPlaybackState = PlaybackState.Playing;
+                ShowPlayerForSound(sound);
                 UpdateStatus(sound.IsYouTube ? $"Loading {sound.Name}..." : $"Playing {sound.Name}");
             }
             catch (Exception ex)
@@ -472,6 +473,7 @@ namespace BoomBx.Views
                 StopButton.IsEnabled = _currentPlaybackState != PlaybackState.Stopped;
 
                 ViewModel.YtIsPlaying = _currentPlaybackState == PlaybackState.Playing;
+                ViewModel.PlayerIsPlaying = _currentPlaybackState == PlaybackState.Playing;
             });
         }
 

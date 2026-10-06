@@ -18,6 +18,8 @@
 - **Text to Speech:** natural Microsoft voices in Hindi, English (India/US/UK) and 100+ languages. Pick speed and pitch, Ctrl+Enter to speak, save lines to your board.
 - **Hotkeys per sound:** right-click a sound → Set hotkey. Press once to play, again to stop.
 - **Drag & drop:** drop MP3/WAV/M4A/FLAC files (or a whole folder) onto the board.
+- **Voice changer:** Deep, Monster, Chipmunk, Robot, Radio, Megaphone, Cave and more - live on your mic. F8 turns it on/off anywhere. "Hear myself" lets you test it in headphones.
+- **Mini player:** a bar at the bottom of every tab to pause, replay, stop or seek whatever is playing.
 - **Mixer:** separate volume for what friends hear and what you hear, mic volume, mute, and a noise gate with a live meter so games don't pick up hiss.
 
 

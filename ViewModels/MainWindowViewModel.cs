@@ -151,6 +151,69 @@ namespace BoomBx.ViewModels
             MixerChanged?.Invoke();
         }
 
+        // ================= Voice changer =================
+
+        public ObservableCollection<VoicePresetCard> VoiceCards { get; } = new();
+
+        [ObservableProperty]
+        private VoicePresetCard? _selectedVoiceCard;
+
+        [ObservableProperty]
+        private bool _voiceEnabled;
+
+        /// <summary>Extra pitch in semitones on top of the effect (-6..+6).</summary>
+        [ObservableProperty]
+        private double _voicePitchTune;
+
+        [ObservableProperty]
+        private bool _monitorEnabled;
+
+        [ObservableProperty]
+        private string _voiceToggleHotkey = "F8";
+
+        /// <summary>Raised when any voice setting changes.</summary>
+        public event Action? VoiceChanged;
+
+        partial void OnSelectedVoiceCardChanged(VoicePresetCard? oldValue, VoicePresetCard? newValue)
+        {
+            if (oldValue != null) oldValue.IsSelected = false;
+            if (newValue != null) newValue.IsSelected = true;
+            VoiceChanged?.Invoke();
+        }
+
+        partial void OnVoiceEnabledChanged(bool value) => VoiceChanged?.Invoke();
+        partial void OnVoicePitchTuneChanged(double value) => VoiceChanged?.Invoke();
+        partial void OnMonitorEnabledChanged(bool value) => VoiceChanged?.Invoke();
+
+        // ================= Mini player (bottom bar) =================
+
+        [ObservableProperty]
+        private bool _playerVisible;
+
+        [ObservableProperty]
+        private string _playerTitle = "";
+
+        [ObservableProperty]
+        private string _playerSubtitle = "";
+
+        [ObservableProperty]
+        private string _playerIconPath = BoomBx.AppPaths.DefaultIcon;
+
+        [ObservableProperty]
+        private Avalonia.Media.Imaging.Bitmap? _playerThumb;
+
+        [ObservableProperty]
+        private bool _playerIsPlaying;
+
+        [ObservableProperty]
+        private string _playerElapsedText = "0:00";
+
+        [ObservableProperty]
+        private string _playerTotalText = "0:00";
+
+        [ObservableProperty]
+        private bool _playerCanSeek;
+
         // ================= Text to speech =================
 
         [ObservableProperty]

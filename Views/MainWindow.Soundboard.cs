@@ -35,6 +35,12 @@ namespace BoomBx.Views
             SoundsDropZone.AddHandler(DragDrop.DragOverEvent, OnSoundsDragOver);
             SoundsDropZone.AddHandler(DragDrop.DropEvent, OnSoundsDrop);
 
+            // Double-click a tile = play it.
+            SoundsList.DoubleTapped += (_, e) =>
+            {
+                if ((e.Source as StyledElement)?.DataContext is SoundItem item) StartAudioProcessing(item);
+            };
+
             // Right-click selects the sound under the mouse, so the menu acts on the right one.
             SoundsList.AddHandler(PointerPressedEvent, (_, e) =>
             {
@@ -184,6 +190,19 @@ namespace BoomBx.Views
         private void RegisterSoundHotkeys()
         {
             if (_hotkeyManager == null) return;
+
+            // Voice changer on/off
+            try
+            {
+                var voiceGesture = KeyGesture.Parse(_settings.VoiceToggleHotkey);
+                _hotkeyManager.RegisterHotkey(voiceGesture, () => Dispatcher.UIThread.Post(ToggleVoiceChanger));
+                ViewModel.VoiceToggleHotkey = voiceGesture.ToString();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Bad voice hotkey '{_settings.VoiceToggleHotkey}': {ex.Message}");
+            }
+
             foreach (var sound in ViewModel.Soundboards.SelectMany(b => b.Sounds).Where(s => s.HasHotkey))
             {
                 try
@@ -226,7 +245,7 @@ namespace BoomBx.Views
             meterTimer.Tick += (_, _) =>
             {
                 var cleanup = _audioService?.MicCleanup;
-                if (cleanup == null || SettingsNav.IsChecked != true) return;
+                if (cleanup == null || (SettingsNav.IsChecked != true && VoiceChangerNav.IsChecked != true)) return;
                 var db = cleanup.TakePeakDb();
                 var level = Math.Clamp((db + 80) / 80 * 100, 0, 100);
                 // fall slowly, rise fast - easier to read

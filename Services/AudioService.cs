@@ -40,6 +40,64 @@ namespace BoomBx.Services
         private bool _gateEnabled = true;
         private float _gateThresholdDb = -45f;
 
+        // ---------------- voice changer ----------------
+
+        private VoicePreset _voicePreset = VoicePreset.All[0];
+        private float _voiceExtraPitch = 1f;
+        private bool _voiceEnabled;
+        private bool _monitorEnabled;
+        private VoiceChangerSampleProvider? _voiceChanger;
+        private MonitorTapSampleProvider? _monitorTap;
+        private WasapiOut? _monitorOutput;
+
+        /// <summary>Changes your live mic voice. Works right away, no restart.</summary>
+        public void SetVoice(VoicePreset preset, float extraPitch, bool enabled)
+        {
+            _voicePreset = preset;
+            _voiceExtraPitch = extraPitch;
+            _voiceEnabled = enabled;
+            _voiceChanger?.Configure(preset, extraPitch, enabled);
+        }
+
+        /// <summary>Hear your own (changed) voice in your headphones.</summary>
+        public void SetMonitor(bool enabled)
+        {
+            _monitorEnabled = enabled;
+            if (_monitorTap != null) _monitorTap.Enabled = enabled;
+            if (enabled) StartMonitorOutput();
+            else StopMonitorOutput();
+        }
+
+        private void StartMonitorOutput()
+        {
+            if (_monitorOutput != null || _monitorTap == null) return;
+            try
+            {
+                using var enumerator = new MMDeviceEnumerator();
+                var speakers = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                _monitorTap.Monitor.ClearBuffer();
+                _monitorOutput = new WasapiOut(speakers, AudioClientShareMode.Shared, true, 40);
+                _monitorOutput.Init(_monitorTap.Monitor);
+                _monitorOutput.Play();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Monitor output failed: {ex.Message}");
+                StopMonitorOutput();
+            }
+        }
+
+        private void StopMonitorOutput()
+        {
+            try
+            {
+                _monitorOutput?.Stop();
+                _monitorOutput?.Dispose();
+            }
+            catch { /* ignore */ }
+            _monitorOutput = null;
+        }
+
         public void SetNoiseGate(bool enabled, float thresholdDb)
         {
             _gateEnabled = enabled;
@@ -173,7 +231,10 @@ namespace BoomBx.Services
                     GateEnabled = _gateEnabled,
                     ThresholdDb = _gateThresholdDb
                 };
-                _micVolume = new VolumeSampleProvider(MicCleanup) { Volume = _micLevel };
+                _voiceChanger = new VoiceChangerSampleProvider(MicCleanup);
+                _voiceChanger.Configure(_voicePreset, _voiceExtraPitch, _voiceEnabled);
+                _monitorTap = new MonitorTapSampleProvider(_voiceChanger) { Enabled = _monitorEnabled };
+                _micVolume = new VolumeSampleProvider(_monitorTap) { Volume = _micLevel };
                 _persistentMixer.AddMixerInput(_micVolume);
 
                 _persistentOutput = new WasapiOut(
@@ -187,6 +248,7 @@ namespace BoomBx.Services
                 _persistentOutput.Init(_persistentMixer);
                 _micCapture.StartRecording();
                 _persistentOutput.Play();
+                if (_monitorEnabled) StartMonitorOutput();
             }
             catch (Exception ex)
             {
@@ -213,6 +275,7 @@ namespace BoomBx.Services
 
         private void StopPersistentAudioRouting()
         {
+            StopMonitorOutput();
             if (_micCapture != null)
             {
                 _micCapture.RecordingStopped -= HandleCaptureError;

@@ -188,6 +188,7 @@ namespace BoomBx.Views
                 if (_audioWaveOutSpeaker == null) return;
 
                 _currentPlaybackState = PlaybackState.Playing;
+                ShowPlayerForTts(_lastTtsText, ViewModel.TtsSelectedVoice?.ShortName ?? "voice");
                 UpdateStatus($"Speaking: {_lastTtsText.TrimTo(40)}");
             }
             catch (Exception ex)

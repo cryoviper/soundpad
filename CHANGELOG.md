@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/)
 
+## [0.4.0]
+### Added
+- Voice Changer: 12 live mic voices (Deep, Monster, Chipmunk, Kid, Robot, Alien, Radio, Megaphone, Cave, Stadium, Demon), fine-tune pitch, "Hear myself" in headphones, global on/off hotkey (F8), ON badge in sidebar
+- Mini player bar at the bottom on every tab: play/pause, replay, stop, seek, loop, your volume, jump to source
+- Sound tiles: play icon on hover, double-click to play, smooth hover animation
+
 ## [0.3.0]
 ### Added
 - YouTube: drag-to-seek bar, "Cut a clip" (mark start/end while playing, preview), Save as MP3 (trimmed) to a folder + auto-add to board, recently played list, Hindi meme quick-searches

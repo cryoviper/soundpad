@@ -94,6 +94,8 @@ namespace BoomBx.Views
             InitializeTts();
             InitializeYouTube();
             InitializeSoundboardExtras();
+            InitializeVoiceChanger();
+            InitializePlayer();
             this.Closing += (s, e) =>
             {
                 _ttsService?.Cleanup();
@@ -315,6 +317,9 @@ namespace BoomBx.Views
                     break;
                 case "PauseHotkeyTextBox":
                     _settings.PauseHotkey = gesture.ToString();
+                    break;
+                case "VoiceToggleHotkeyTextBox":
+                    _settings.VoiceToggleHotkey = gesture.ToString();
                     break;
             }
             

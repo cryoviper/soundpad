@@ -17,6 +17,9 @@ public class LoopStream : WaveStream
         _sourceStream = sourceStream;
     }
 
+    /// <summary>The real file reader (for position / seeking in the player bar).</summary>
+    public WaveStream Source => _sourceStream;
+
     public override WaveFormat WaveFormat => _sourceStream.WaveFormat;
     
     public override long Length => _sourceStream.Length;
