@@ -1,0 +1,789 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:BoomBx.ViewModels"
+        xmlns:views="using:BoomBx.Views"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:conv="using:BoomBx.Converters"
+        mc:Ignorable="d" 
+        x:Class="BoomBx.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        xmlns:model="using:BoomBx.Models"
+        Icon="/Assets/logo.png"
+        Title="Boobies Soundpad"
+        Background="#1A1A1A"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI"
+        CanResize="True"
+        Width="1200"
+        Height="800"
+        MinWidth="1200"
+        MinHeight="800">
+    
+    <Window.Resources>
+        <conv:UriToImageSourceConverter x:Key="UriConverter"/>
+        <conv:NavigationEqualityConverter x:Key="NavigationEqualityConverter"/>
+        <conv:BoolToGridLengthConverter x:Key="BoolToGridLengthConverter"/>
+
+        <ControlTheme x:Key="CustomListBoxItemTheme" TargetType="ListBoxItem">
+            <Setter Property="Background" Value="#1A1A1A"/>
+            <Style Selector="^:selected">
+                <Setter Property="Background" Value="#1A1A1A"/>
+            </Style>
+            <Style Selector="^:focused">
+                <Setter Property="Background" Value="#1A1A1A"/>
+            </Style>
+            <Style Selector="^:pointerover">
+                <Setter Property="Background" Value="#1A1A1A"/>
+            </Style>
+            <Style Selector="^:selected:focused">
+                <Setter Property="Background" Value="#1A1A1A"/>
+            </Style>
+        </ControlTheme>
+    </Window.Resources>
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Grid Background="#1A1A1A"
+          HorizontalAlignment="Stretch" 
+          VerticalAlignment="Stretch">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="{Binding #SoundsNav.IsChecked, Converter={StaticResource BoolToGridLengthConverter}}"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="300"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Background="#252525" Margin="0,0,1,0">
+            <StackPanel Spacing="0">
+                <Border Padding="15" Background="#2D2D2D">
+                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <Image Source="/Assets/logo.png" Width="50" Height="50"/>
+                        <StackPanel VerticalAlignment="Center" Spacing="0">
+                            <TextBlock Text="BOOBIES"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       Foreground="#E0E0E0"/>
+                            <TextBlock Text="SOUNDPAD"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="#FF5C9A"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+                
+                <StackPanel Spacing="10" Margin="10">
+                    <RadioButton x:Name="SoundsNav"
+                                 GroupName="Nav"
+                                 Content="Sounds"
+                                 Classes="SidebarButton"
+                                 Tag="{x:Static views:NavigationItem.Sounds}"
+                                 IsChecked="True"/>
+                    
+                    <RadioButton x:Name="YouTubeNav"
+                                 GroupName="Nav"
+                                 Content="YouTube Live"
+                                 Classes="SidebarButton"
+                                 Tag="{x:Static views:NavigationItem.YouTube}"/>
+
+                    <RadioButton x:Name="TextToSpeechNav"
+                                 GroupName="Nav"
+                                 Content="Text-to-Speech"
+                                 Classes="SidebarButton"
+                                 Tag="{x:Static views:NavigationItem.TextToSpeech}"
+                                 Checked="TextToSpeechNav_Checked"/>
+                    
+                    <RadioButton x:Name="VoiceChangerNav"
+                                 GroupName="Nav"
+                                 Content="Voice Changer"
+                                 Classes="SidebarButton"
+                                 Tag="{x:Static views:NavigationItem.VoiceChanger}"/>
+                    
+                    <RadioButton x:Name="SettingsNav"
+                                 GroupName="Nav"
+                                 Content="Settings"
+                                 Classes="SidebarButton"
+                                 Tag="{x:Static views:NavigationItem.Settings}"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1" Background="#252525" Margin="0,0,1,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Border Background="#333333" CornerRadius="4" Padding="5" Margin="10">
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="SOUNDBOARDS" Foreground="#A0A0A0" FontSize="12"/>
+                        <ListBox ItemsSource="{Binding Soundboards}"
+                                 SelectionChanged="SoundboardList_SelectionChanged"
+                                 SelectedItem="{Binding SelectedSoundboard, Mode=TwoWay}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 Background="Transparent"
+                                 BorderThickness="0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" 
+                                               Foreground="#E0E0E0"
+                                               Padding="5"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <Button Content="➕" 
+                                    Click="AddSoundboard" 
+                                    Width="50" Background="#404040"
+                                    Foreground="White"/>
+                            <Button Content="✏️" 
+                                    Click="RenameSoundboard" 
+                                    Width="50" Background="#404040" 
+                                    Foreground="White"/>
+                            <Button Content="🗑️" 
+                                    Click="RemoveSoundboard" 
+                                    Width="50" Background="#404040" 
+                                    Foreground="White"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
+        </Border>
+        
+        <Border Grid.Column="2" Background="#252525" Margin="0,0,1,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="MainUI" 
+                            IsVisible="False" 
+                            Spacing="20" 
+                            HorizontalAlignment="Center" 
+                            VerticalAlignment="Top"
+                            Margin="20">
+                    <Border Background="#2D2D2D" CornerRadius="8" Padding="25"
+                            IsVisible="{Binding #SoundsNav.IsChecked}">
+                        <StackPanel Spacing="20">
+                            <TextBlock Text="Sound Library" FontSize="22" FontWeight="Bold"
+                                    Foreground="#E0E0E0" HorizontalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Button Content="Add Sound" Click="AddToLibrary" 
+                                        Width="120" Background="#007ACC"/>
+                                <Button Content="Remove Selected" Click="RemoveFromLibrary" 
+                                        Width="120" Background="#c20000"/>
+                            </StackPanel>
+
+                            <Border Background="#333333" CornerRadius="4">
+                                <ListBox SelectionMode="Single" ItemsSource="{Binding SelectedSoundboard.Sounds}"
+                                        SelectedItem="{Binding SelectedSound, Mode=TwoWay}"
+                                        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Padding="0"
+                                        ItemContainerTheme="{StaticResource CustomListBoxItemTheme}">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="4" 
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Top"
+                                                Margin="0 10"/>
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate DataType="model:SoundItem">
+                                            <Border Classes="listbox-item"
+                                                    Width="200" 
+                                                    Height="160" 
+                                                    Background="#333333" 
+                                                    CornerRadius="8"
+                                                    Margin="5"
+                                                    Padding="10"
+                                                    Cursor="Hand">
+                                                <Border.Styles>
+                                                    <Style Selector="Border.listbox-item:focus">
+                                                        <Setter Property="BorderThickness" Value="1"/>
+                                                    </Style>
+                                                    <Style Selector="Border.listbox-item">
+                                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                                        <Setter Property="BorderThickness" Value="2"/>
+                                                    </Style>
+                                                    <Style Selector="Border.listbox-item:pointerover">
+                                                        <Setter Property="RenderTransform">
+                                                            <TransformGroup>
+                                                                <ScaleTransform ScaleX="1.02" ScaleY="1.02"/>
+                                                            </TransformGroup>
+                                                        </Setter>
+                                                    </Style>
+                                                </Border.Styles>
+                                                <StackPanel Spacing="8" HorizontalAlignment="Center">
+                                                    <Border Width="80" 
+                                                            Height="80" 
+                                                            Background="#404040" 
+                                                            CornerRadius="4">
+                                                        <Image Source="{Binding IconPath, Converter={StaticResource UriConverter}}"
+                                                            Width="40" 
+                                                            Height="40"/>
+                                                    </Border>
+                                                    <TextBlock Text="{Binding Name}" 
+                                                            Foreground="#E0E0E0"
+                                                            FontSize="13"
+                                                            TextWrapping="Wrap"
+                                                            HorizontalAlignment="Center"
+                                                            MaxWidth="100"
+                                                            TextAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ============ YouTube Live ============ -->
+                    <Border Background="#2D2D2D" CornerRadius="8" Padding="25" Width="660"
+                            IsVisible="{Binding #YouTubeNav.IsChecked}">
+                        <StackPanel Spacing="14">
+                            <StackPanel HorizontalAlignment="Center" Spacing="4">
+                                <TextBlock Text="YouTube Live" FontSize="22" FontWeight="Bold"
+                                           Foreground="#E0E0E0" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Search any sound or song and it plays straight into your mic. No downloads."
+                                           FontSize="12" Foreground="#808080" HorizontalAlignment="Center"/>
+                            </StackPanel>
+
+                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                <TextBox x:Name="YtSearchBox"
+                                         Text="{Binding YtQuery, Mode=TwoWay}"
+                                         Watermark="Search YouTube or paste a link..."
+                                         Height="40"
+                                         FontSize="14"
+                                         VerticalContentAlignment="Center"
+                                         Background="#333333"
+                                         Foreground="White"/>
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding YtStartText, Mode=TwoWay}"
+                                         Watermark="Start 0:00"
+                                         ToolTip.Tip="Optional: start the clip at this time (like 0:15)"
+                                         Width="96"
+                                         Height="40"
+                                         Margin="8,0,0,0"
+                                         FontSize="14"
+                                         VerticalContentAlignment="Center"
+                                         Background="#333333"
+                                         Foreground="White"/>
+                                <Button Grid.Column="2"
+                                        Content="Search"
+                                        Click="YtSearch_Click"
+                                        IsEnabled="{Binding !YtIsSearching}"
+                                        Height="40"
+                                        Width="90"
+                                        Margin="8,0,0,0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        Background="#007ACC"
+                                        Foreground="White"/>
+                            </Grid>
+
+                            <ProgressBar IsIndeterminate="True"
+                                         IsVisible="{Binding YtIsSearching}"
+                                         Height="4" MinHeight="4"
+                                         Foreground="#007ACC"/>
+
+                            <TextBlock Text="{Binding YtStatus}"
+                                       Foreground="#A0A0A0"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"/>
+
+                            <!-- Now playing -->
+                            <Border Background="#333333" CornerRadius="8" Padding="12"
+                                    IsVisible="{Binding YtNowPlaying, Converter={x:Static views:ObjectNotNullToVisibilityConverter.Instance}}">
+                                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                                    <Border Grid.RowSpan="2" Width="112" Height="63" CornerRadius="6"
+                                            ClipToBounds="True" Background="#404040" VerticalAlignment="Top">
+                                        <Image Source="{Binding YtNowPlaying.Thumbnail}" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="12,0" Spacing="6" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding YtNowPlayingTitle}"
+                                                   Foreground="#E0E0E0"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <ProgressBar Value="{Binding YtProgress}" Minimum="0" Maximum="100"
+                                                     Height="4" MinHeight="4" Foreground="#FF3355"/>
+                                        <TextBlock Text="{Binding YtProgressText}" Foreground="#A0A0A0" FontSize="11"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <Button Content="{Binding YtPlayPauseText}" Click="YtPlayPause_Click"
+                                                ToolTip.Tip="Play / pause"
+                                                Width="44" Height="40"
+                                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                Background="#007ACC" Foreground="White"/>
+                                        <Button Content="⏹" Click="YtStop_Click"
+                                                ToolTip.Tip="Stop"
+                                                Width="44" Height="40"
+                                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                Background="#404040" Foreground="White"/>
+                                        <Button Content="⭐" Click="YtPinNowPlaying_Click"
+                                                ToolTip.Tip="Pin to soundboard"
+                                                Width="44" Height="40"
+                                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                Background="#404040" Foreground="White"/>
+                                    </StackPanel>
+                                    <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                          ColumnDefinitions="Auto,*,Auto,Auto" Margin="12,8,0,0">
+                                        <TextBlock Text="Volume" Foreground="#A0A0A0" FontSize="12" VerticalAlignment="Center"/>
+                                        <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                                                Value="{Binding YtVolume, Mode=TwoWay}"
+                                                Margin="10,0" Foreground="#007ACC"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding YtVolume, StringFormat='{}{0:F0}%'}"
+                                                   Foreground="#A0A0A0" FontSize="12" Width="36" VerticalAlignment="Center"/>
+                                        <CheckBox Grid.Column="3" Content="Loop" IsChecked="{Binding IsLoopingEnabled}"
+                                                  Foreground="#E0E0E0" Margin="10,0,0,0"/>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+
+                            <!-- Results -->
+                            <ItemsControl x:Name="YtResultsList" ItemsSource="{Binding YtResults}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="model:YouTubeResult">
+                                        <Border Classes="yt-row" Background="#333333" CornerRadius="8" Padding="8" Margin="0,0,0,8">
+                                            <Border.Styles>
+                                                <Style Selector="Border.yt-row:pointerover">
+                                                    <Setter Property="Background" Value="#3A3A3A"/>
+                                                </Style>
+                                            </Border.Styles>
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <Border Width="128" Height="72" CornerRadius="6" ClipToBounds="True" Background="#404040">
+                                                    <Panel>
+                                                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"/>
+                                                        <Border Background="#CC000000" CornerRadius="3" Padding="4,1"
+                                                                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="4">
+                                                            <TextBlock Text="{Binding DurationText}" FontSize="11" Foreground="White"/>
+                                                        </Border>
+                                                    </Panel>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center" Spacing="4">
+                                                    <TextBlock Text="{Binding Title}"
+                                                               Foreground="#E0E0E0"
+                                                               FontSize="14"
+                                                               FontWeight="SemiBold"
+                                                               TextWrapping="Wrap"
+                                                               MaxLines="2"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding Channel}" Foreground="#A0A0A0" FontSize="12"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="● LIVE IN MIC" Foreground="#FF3355" FontSize="11"
+                                                               FontWeight="Bold" IsVisible="{Binding IsPlaying}"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                    <Button Content="▶" Tag="{Binding}" Classes="yt-play"
+                                                            ToolTip.Tip="Play live in mic"
+                                                            Width="44" Height="40"
+                                                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                            Background="#007ACC" Foreground="White"/>
+                                                    <Button Content="⭐" Tag="{Binding}" Classes="yt-pin"
+                                                            ToolTip.Tip="Pin to soundboard"
+                                                            Width="44" Height="40"
+                                                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                            Background="#404040" Foreground="White"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#2D2D2D" CornerRadius="8" Padding="25"
+                            IsVisible="{Binding #TextToSpeechNav.IsChecked}">
+                        <StackPanel Spacing="15">
+                            <TextBlock Text="Text-to-Speech" 
+                                    FontSize="22" 
+                                    FontWeight="Bold"
+                                    Foreground="#E0E0E0"
+                                    HorizontalAlignment="Center"/>
+                            
+                            <TextBox Text="{Binding TtsText, Mode=TwoWay}"
+                                    Watermark="Enter text to speak..."
+                                    AcceptsReturn="True"
+                                    Height="100"
+                                    FontSize="14"
+                                    Background="#333333"
+                                    Foreground="White"/>
+                            
+                            <StackPanel Spacing="10">
+                                <ComboBox ItemsSource="{Binding AvailableVoices}"
+                                        SelectedItem="{Binding SelectedVoice}"
+                                        FontSize="14"
+                                        Height="40">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Name}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Volume:" Foreground="#E0E0E0"/>
+                                    <Slider Minimum="0" Maximum="100" 
+                                            Value="{Binding TtsVolume, Mode=TwoWay}"
+                                            Foreground="#007ACC"/>
+                                    
+                                    <TextBlock Text="Pitch:" Foreground="#E0E0E0"/>
+                                    <Slider Minimum="0.5" Maximum="2.0" 
+                                            Value="{Binding TtsPitch, Mode=TwoWay}"
+                                            Foreground="#007ACC"/>
+                                    
+                                    <StackPanel Spacing="5">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Speed:" Foreground="#E0E0E0"/>
+                                            <TextBlock Text="{Binding TtsSpeed, StringFormat=' {0:F1}x'}" 
+                                                    Foreground="#A0A0A0" 
+                                                    Margin="5,0,0,0"/>
+                                        </StackPanel>
+                                        <Slider Minimum="0.1" Maximum="2.0" 
+                                                Value="{Binding TtsSpeed, Mode=TwoWay}"
+                                                TickFrequency="0.1"
+                                                IsSnapToTickEnabled="False"
+                                                Foreground="#007ACC"/>
+                                        <TextBlock Text="Tip: Use 0.5-0.8 for slower, clearer speech" 
+                                                FontSize="11" 
+                                                Foreground="#606060" 
+                                                Margin="0,-5,0,5"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                                <Button Content="▶ Preview" 
+                                        Click="PreviewTts_Click"
+                                        Width="120"
+                                        Background="#007ACC"/>
+                                
+                                <Button Content="💾 Save Audio" 
+                                        Click="SaveTtsAudio_Click"
+                                        Width="120"
+                                        Background="#404040"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#2D2D2D" CornerRadius="8" Padding="25"
+                            IsVisible="{Binding #VoiceChangerNav.IsChecked}">
+                        <TextBlock Text="AI Voice Changer (Coming Soon)" 
+                                Foreground="#A0A0A0" FontSize="16"
+                                HorizontalAlignment="Center"/>
+                    </Border>
+
+                    <Border Background="#2D2D2D" CornerRadius="8" Padding="25"
+                            IsVisible="{Binding #SettingsNav.IsChecked}">
+                        <StackPanel Spacing="15">
+                            <TextBlock Text="Audio Settings" FontSize="22" FontWeight="Bold"
+                                    Foreground="#E0E0E0" HorizontalAlignment="Center"/>
+                            
+                            <StackPanel Spacing="10">
+                                <StackPanel Spacing="5">
+                                    <TextBlock Text="PLAYBACK DEVICE" 
+                                            Foreground="#A0A0A0"
+                                            FontSize="12"
+                                            FontWeight="Bold"/>
+                                    <ComboBox x:Name="PlaybackComboBox" 
+                                        ItemsSource="{Binding PlaybackDevices}"
+                                        SelectedItem="{Binding SelectedPlaybackDevice}"
+                                        Height="40" 
+                                        FontSize="14">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding FriendlyName}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Spacing="5">
+                                    <TextBlock Text="MICROPHONE INPUT" 
+                                            Foreground="#A0A0A0"
+                                            FontSize="12"
+                                            FontWeight="Bold"/>
+                                            <ComboBox x:Name="CaptureComboBox" 
+                                                ItemsSource="{Binding CaptureDevices}"
+                                                SelectedItem="{Binding SelectedCaptureDevice}"
+                                                Height="40" 
+                                                FontSize="14">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding FriendlyName}"/>
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Spacing="15">
+                                <TextBlock Text="Hotkeys" FontSize="18" FontWeight="SemiBold"
+                                        Foreground="#E0E0E0" HorizontalAlignment="Left" Margin="0,20,0,0"/>
+
+                                <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
+                                    <TextBlock Grid.Column="0" Text="Play / Pause Sound" VerticalAlignment="Center" Foreground="#E0E0E0"/>
+                                    <TextBox Grid.Column="1" Name="PlayPauseHotkeyTextBox" MinWidth="150"
+                                            Text="{Binding PlayPauseHotkey, Mode=OneWay}" IsReadOnly="True"
+                                            VerticalContentAlignment="Center"/>
+                                    <Button Grid.Column="2" Content="Set" Margin="5,0,0,0"
+                                            Click="SetHotkey_Click" Tag="{Binding #PlayPauseHotkeyTextBox}"/>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
+                                    <TextBlock Grid.Column="0" Text="Stop Sound" VerticalAlignment="Center" Foreground="#E0E0E0"/>
+                                    <TextBox Grid.Column="1" Name="StopHotkeyTextBox" MinWidth="150"
+                                            Text="{Binding StopHotkey, Mode=OneWay}" IsReadOnly="True"
+                                            VerticalContentAlignment="Center"/>
+                                    <Button Grid.Column="2" Content="Set" Margin="5,0,0,0"
+                                            Click="SetHotkey_Click" Tag="{Binding #StopHotkeyTextBox}"/>
+                                </Grid>
+                                
+                                <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
+                                    <TextBlock Grid.Column="0" Text="Pause Sound" VerticalAlignment="Center" Foreground="#E0E0E0"/>
+                                    <TextBox Grid.Column="1" Name="PauseHotkeyTextBox" MinWidth="150"
+                                            Text="{Binding PauseHotkey, Mode=OneWay}" IsReadOnly="True"
+                                            VerticalContentAlignment="Center"/>
+                                    <Button Grid.Column="2" Content="Set" Margin="5,0,0,0"
+                                            Click="SetHotkey_Click" Tag="{Binding #PauseHotkeyTextBox}"/>
+                                </Grid>
+
+                                </StackPanel>
+                                
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20" Margin="0,10,0,0">
+                                <Button ToolTip.Tip="Built on BoomBx by sardeq (Apache 2.0)" Click="OpenGitHub" Background="Transparent" BorderThickness="0" Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Image Source="/Assets/github.png" Width="20" Height="20"/>
+                                        <TextBlock Text="Built on BoomBx by sardeq" Foreground="#808080" FontSize="12" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+
+                            <TextBlock Text="{Binding AppVersion}" 
+                                    Foreground="#606060"
+                                    FontSize="12"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,20,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <Border Grid.Column="3"
+                Background="#252525"
+                Margin="20"
+                CornerRadius="8"
+                IsVisible="{Binding SelectedSound, Converter={x:Static views:ObjectNotNullToVisibilityConverter.Instance}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="20" Margin="15">
+                    <Border Background="#333333" CornerRadius="8" Padding="15">
+                        <StackPanel HorizontalAlignment="Center" Spacing="10">
+                            <Image Source="{Binding SelectedSound.IconPath, Converter={StaticResource UriConverter}}"
+                                   Width="60" Height="60"/>
+                            <TextBlock Text="SELECTED AUDIO" 
+                                       Foreground="#A0A0A0"
+                                       FontSize="12"
+                                       FontWeight="Bold"/>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Spacing="15">
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="Title" Foreground="#A0A0A0" FontSize="12"/>
+                            <TextBox Text="{Binding SelectedSound.Name, Mode=TwoWay}"
+                                     FontSize="14"
+                                     Background="#333333"
+                                     Foreground="White"
+                                     BorderThickness="0"
+                                     Padding="10"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="Volume" Foreground="#A0A0A0" FontSize="12"/>
+                            <Slider Minimum="0" Maximum="100" 
+                                    Value="{Binding SelectedSound.Volume, Mode=TwoWay}"
+                                    Background="Transparent"
+                                    Foreground="#007ACC"/>
+                            <TextBlock Text="{Binding SelectedSound.Volume, StringFormat='{}Volume: {0:F0}%'}"
+                                       Foreground="#A0A0A0"
+                                       FontSize="12"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="Bass (dB)" Foreground="#A0A0A0" FontSize="12"/>
+                            <Slider Minimum="-20" Maximum="20" 
+                                    Value="{Binding SelectedSound.Bass, Mode=TwoWay}"
+                                    Background="Transparent"
+                                    Foreground="#007ACC"/>
+                            <TextBlock Text="{Binding SelectedSound.Bass, StringFormat='{}Bass: {0:F0} dB'}"
+                                    Foreground="#A0A0A0"
+                                    FontSize="12"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="Treble (dB)" Foreground="#A0A0A0" FontSize="12"/>
+                            <Slider Minimum="-20" Maximum="20" 
+                                    Value="{Binding SelectedSound.Treble, Mode=TwoWay}"
+                                    Background="Transparent"
+                                    Foreground="#007ACC"/>
+                            <TextBlock Text="{Binding SelectedSound.Treble, StringFormat='{}Treble: {0:F0} dB'}"
+                                    Foreground="#A0A0A0"
+                                    FontSize="12"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="Pitch" Foreground="#A0A0A0" FontSize="12"/>
+                            <Slider Minimum="0.5" Maximum="2.0" 
+                                    Value="{Binding SelectedSound.Pitch, Mode=TwoWay}"
+                                    Background="Transparent"
+                                    Foreground="#007ACC"/>
+                            <TextBlock Text="{Binding SelectedSound.Pitch, StringFormat='{}Pitch: {0:F1}x'}"
+                                    Foreground="#A0A0A0"
+                                    FontSize="12"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="8" IsVisible="{Binding SelectedSound.IsYouTube}">
+                            <TextBlock Text="YouTube clip (streams live)" Foreground="#FF5C9A" FontSize="12" FontWeight="SemiBold"/>
+                            <Grid ColumnDefinitions="*,*">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Start (m:ss)" Foreground="#A0A0A0" FontSize="12"/>
+                                    <TextBox Text="{Binding SelectedSound.StartText, Mode=OneWay}" Tag="start" LostFocus="ClipTimeBox_LostFocus"
+                                             Background="#333333" Foreground="White" BorderThickness="0" Padding="8"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4" Margin="8,0,0,0">
+                                    <TextBlock Text="End (blank = full)" Foreground="#A0A0A0" FontSize="12"/>
+                                    <TextBox Text="{Binding SelectedSound.EndText, Mode=OneWay}" Tag="end" LostFocus="ClipTimeBox_LostFocus"
+                                             Background="#333333" Foreground="White" BorderThickness="0" Padding="8"/>
+                                </StackPanel>
+                            </Grid>
+                            <Button Content="Open on YouTube" Click="OpenOnYouTube_Click" Background="#404040"/>
+                        </StackPanel>
+
+                        <Button Content="Change Icon" 
+                                Click="ChangeIconClicked" 
+                                Width="120" 
+                                Background="#007ACC"/>
+                        <Button Content="Save Changes" 
+                                Click="SaveChangesClicked" 
+                                Width="120" 
+                                Background="#007ACC"/>
+                    </StackPanel>
+
+                    <CheckBox Content="Loop Audio" 
+                              IsChecked="{Binding IsLoopingEnabled}"
+                              Margin="0,0,0,10"
+                              Foreground="#E0E0E0"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button x:Name="PlayPauseButton" 
+                                Content="▶ Play" 
+                                FontSize="16" 
+                                Height="50"
+                                HorizontalAlignment="Stretch"
+                                Background="#007ACC"
+                                Foreground="White"
+                                Click="PlayPauseHandler"/>
+                        <Button x:Name="StopButton" 
+                                Content="⏹ Stop" 
+                                FontSize="16" 
+                                Height="50"
+                                HorizontalAlignment="Stretch"
+                                Background="#404040"
+                                Foreground="White"
+                                Click="StopHandler"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="StatMessage" 
+                               VerticalAlignment="Center"
+                               Foreground="#E0E0E0"
+                               FontSize="13"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <Border x:Name="InstallationPanel" Grid.ColumnSpan="3"
+                Background="#2D2D2D" 
+                Padding="20" 
+                CornerRadius="8"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                ZIndex="100"
+                IsVisible="False">
+            <StackPanel Spacing="15">
+                <TextBlock Text="VB-Cable Installation" 
+                           FontSize="16" 
+                           FontWeight="SemiBold"
+                           Foreground="#E0E0E0"/>
+                <StackPanel Orientation="Horizontal" 
+                            HorizontalAlignment="Center" 
+                            Spacing="15">
+                    <Button Content="Install Now" 
+                            Click="OnInstallClicked" 
+                            Width="120"
+                            Background="#007ACC"
+                            Foreground="White"/>
+                    <Button Content="Install Later" 
+                            Click="OnExitClicked" 
+                            Width="120"
+                            Background="#404040"
+                            Foreground="White"/>
+                </StackPanel>
+                <TextBlock x:Name="InstallationMessageT1" 
+                           VerticalAlignment="Center"
+                           Foreground="#E0E0E0"
+                           FontSize="13"
+                           Text="It appears you don't have VB-Cable, some functionalities may not work."/>
+                <TextBlock x:Name="InstallationMessageT" 
+                           VerticalAlignment="Center"
+                           Foreground="#E0E0E0"
+                           FontSize="13"/>
+            </StackPanel>
+        </Border>
+
+        <Border x:Name="ProgressBarContainer" Grid.ColumnSpan="3"
+                Background="#252525" 
+                Height="50"
+                VerticalAlignment="Bottom"
+                Padding="15"
+                CornerRadius="4"
+                IsVisible="False">
+            <StackPanel Orientation="Horizontal" 
+                        Spacing="15"
+                        VerticalAlignment="Center">
+                <ProgressBar Width="250" 
+                             Height="8" 
+                             IsIndeterminate="True"
+                             Foreground="#007ACC"/>
+                <TextBlock x:Name="ProgressStatus" 
+                           VerticalAlignment="Center"
+                           Foreground="#E0E0E0"
+                           FontSize="13"/>
+                <TextBlock x:Name="InstallationMessage" 
+                           VerticalAlignment="Center"
+                           Foreground="#E0E0E0"
+                           FontSize="13"/>
+                <TextBlock x:Name="StatusMessage" 
+                           VerticalAlignment="Center"
+                           Foreground="#E0E0E0"
+                           FontSize="13"/>
+            </StackPanel>
+        </Border>
+
+        <Border x:Name="BottomContainer" Grid.ColumnSpan="3"
+                Background="#252525" 
+                Height="50"
+                VerticalAlignment="Bottom"
+                Padding="15"
+                CornerRadius="4"
+                IsVisible="True">
+            <StackPanel Orientation="Horizontal" 
+                        Spacing="15"
+                        VerticalAlignment="Center">
+                <TextBlock x:Name="StatoMessage" 
+                           VerticalAlignment="Center"
+                           Foreground="#E0E0E0"
+                           FontSize="13"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

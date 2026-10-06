@@ -1,0 +1,15 @@
+Boobies Soundpad
+Copyright 2026 Praveen Sinwar (Xyron Studio)
+
+This product is a modified version of BoomBx
+(https://github.com/sardeq/BoomBx), Copyright sardeq,
+licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Changes from BoomBx:
+- Added "YouTube Live" tab: search YouTube and stream audio live into the
+  virtual mic (VB-Cable) and speakers, without downloading files.
+- YouTube clips can be pinned to soundboards (with start/end times) and
+  played with the same hotkeys, volume, EQ and pitch controls.
+- Fixed Text-to-Speech playback sharing one stream between two outputs.
+- New name, logo and default icon; app data now in %AppData%\BoobiesSoundpad;
+  log file moved from Desktop to the app data folder.
