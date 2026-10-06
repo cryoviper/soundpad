@@ -89,13 +89,14 @@ namespace BoomBx.Views
                 Dispatcher.UIThread
             );
 
-            InitializeAudioService();
-            InitializeMixer();
-            InitializeTts();
-            InitializeYouTube();
-            InitializeSoundboardExtras();
-            InitializeVoiceChanger();
-            InitializePlayer();
+            // Each feature starts on its own: if one breaks, the rest of the app still opens.
+            SafeInit("audio", InitializeAudioService);
+            SafeInit("mixer", InitializeMixer);
+            SafeInit("text to speech", InitializeTts);
+            SafeInit("YouTube", InitializeYouTube);
+            SafeInit("soundboard", InitializeSoundboardExtras);
+            SafeInit("voice changer", InitializeVoiceChanger);
+            SafeInit("player bar", InitializePlayer);
             this.Closing += (s, e) =>
             {
                 _ttsService?.Cleanup();
@@ -106,6 +107,19 @@ namespace BoomBx.Views
             this.Opacity = 1;
             this.IsVisible = false;
             Console.WriteLine("[3] Window properties set");
+        }
+
+        private void SafeInit(string name, Action init)
+        {
+            try
+            {
+                init();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[Startup] {name} failed: {ex}");
+                Dispatcher.UIThread.Post(() => UpdateStatus($"{name} couldn't start: {ex.Message}", true));
+            }
         }
 
         private void DebugEmbeddedResources()

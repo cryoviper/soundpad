@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/)
 
+## [0.4.1]
+### Fixed
+- App closing right after opening (hover style on sound tiles was placed where Avalonia doesn't allow it)
+- Crashes now show a message and save details to %AppData%\BoobiesSoundpad\crash.log instead of closing silently
+- One broken feature can no longer stop the whole app from starting
+
 ## [0.4.0]
 ### Added
 - Voice Changer: 12 live mic voices (Deep, Monster, Chipmunk, Kid, Robot, Alien, Radio, Megaphone, Cave, Stadium, Demon), fine-tune pitch, "Hear myself" in headphones, global on/off hotkey (F8), ON badge in sidebar

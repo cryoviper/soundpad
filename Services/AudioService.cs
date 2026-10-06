@@ -258,6 +258,18 @@ namespace BoomBx.Services
 
         private void OnMicData(BufferedWaveProvider buffer, WaveInEventArgs a)
         {
+            try
+            {
+                OnMicDataCore(buffer, a);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Mic data error: {ex.Message}"); // never crash the capture thread
+            }
+        }
+
+        private void OnMicDataCore(BufferedWaveProvider buffer, WaveInEventArgs a)
+        {
             buffer.AddSamples(a.Buffer, 0, a.BytesRecorded);
 
             // If more than ~150 ms piles up, drop the oldest part so the delay stays low.

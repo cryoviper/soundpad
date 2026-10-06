@@ -49,6 +49,13 @@ public partial class App : Application
         {
             _desktop = desktop;
             _desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            // A bug in one button/handler should show an error, not close the whole app.
+            Dispatcher.UIThread.UnhandledException += (_, e) =>
+            {
+                Logger.Log($"[UI error] {e.Exception}");
+                e.Handled = true;
+            };
             
             BindingPlugins.DataValidators.RemoveAt(0);
             

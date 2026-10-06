@@ -52,12 +52,6 @@
             <Style Selector="^:pointerover /template/ Border#tile">
                 <Setter Property="Background" Value="{StaticResource Surface3Brush}"/>
             </Style>
-            <Style Selector="^ Border.play-hint">
-                <Setter Property="Opacity" Value="0"/>
-            </Style>
-            <Style Selector="^:pointerover Border.play-hint">
-                <Setter Property="Opacity" Value="1"/>
-            </Style>
             <Style Selector="^:selected /template/ Border#tile">
                 <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                 <Setter Property="Background" Value="#2A1F28"/>
@@ -139,6 +133,16 @@
             </Border>
         </DataTemplate>
     </Window.Resources>
+
+    <Window.Styles>
+        <!-- Play icon that fades in when hovering a sound tile -->
+        <Style Selector="Border.play-hint">
+            <Setter Property="Opacity" Value="0"/>
+        </Style>
+        <Style Selector="ListBoxItem:pointerover Border.play-hint">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+    </Window.Styles>
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
