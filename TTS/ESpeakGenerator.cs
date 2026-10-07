@@ -30,7 +30,7 @@ public class ESpeakGenerator
 
         try
         {
-            _extractionDir = Path.Combine(Path.GetTempPath(), "BoomBx_espeak");
+            _extractionDir = Path.Combine(Path.GetTempPath(), "BoobiesSoundpad_espeak");
             
             // Clean up any existing extraction directory
             if (Directory.Exists(_extractionDir))
@@ -42,7 +42,7 @@ public class ESpeakGenerator
                 catch
                 {
                     // If we can't delete, try a different temp directory
-                    _extractionDir = Path.Combine(Path.GetTempPath(), $"BoomBx_espeak_{Guid.NewGuid():N}");
+                    _extractionDir = Path.Combine(Path.GetTempPath(), $"BoobiesSoundpad_espeak_{Guid.NewGuid():N}");
                 }
             }
             

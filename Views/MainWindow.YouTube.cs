@@ -298,7 +298,7 @@ namespace BoomBx.Views
             bool isTabSound = _playingSound == ViewModel.YtCurrentSound;
 
             // Safety net: the speaker output stopped asking for audio (device error) -> stop instead of hanging.
-            if (_currentPlaybackState == PlaybackState.Playing && source.MsSinceSpeakerRead > 4000)
+            if (_currentPlaybackState == PlaybackState.Playing && source.MsSinceSpeakerRead > 8000)
             {
                 Logger.Log("[YouTube] speaker output stopped reading - stopping playback");
                 StopAudioProcessing(updateStatus: false);

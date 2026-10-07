@@ -898,15 +898,5 @@ namespace BoomBx.Views
                 SaveSoundLibrary();
             }
         }
-
-        //to whoever reading this, i will clean up and optimize i promise LATER
-        private void OpenGitHub(object? sender, RoutedEventArgs e)
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "https://github.com/sardeq/BoomBx",
-                UseShellExecute = true
-            });
-        }
     }
 }

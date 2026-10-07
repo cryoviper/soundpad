@@ -245,7 +245,7 @@ namespace BoomBx.Services
                 );
                 _persistentOutput.PlaybackStopped += HandleOutputError;
 
-                _persistentOutput.Init(_persistentMixer);
+                _persistentOutput.Init(new SoftLimiterSampleProvider(_persistentMixer));
                 _micCapture.StartRecording();
                 _persistentOutput.Play();
                 if (_monitorEnabled) StartMonitorOutput();
@@ -338,7 +338,8 @@ namespace BoomBx.Services
                 input = new WdlResamplingSampleProvider(input, targetFormat.SampleRate);
             }
 
-            return input;
+            // Never hand back a short buffer mid-sound (the mixer would drop the sound).
+            return new FullReadSampleProvider(input);
         }
 
         public void Dispose()

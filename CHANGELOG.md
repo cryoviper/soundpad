@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/)
 
+## [0.4.2]
+### Fixed
+- Sounds cutting out / glitching in Discord and games: the mixer dropped a sound whenever the resampler handed back a few samples short. Every sound now always delivers full buffers.
+- Harsh crackle when mic + sound are loud together: soft limiter on the final mix
+- YouTube clips start much faster: playback begins after the first ~200 KB while the rest downloads in the background (no more waiting / pressing pause-play to get it going)
+- If YouTube is slow, it switches to the backup engine automatically after 10 s
+
+### Changed
+- Removed credits/links from the app and README
+
 ## [0.4.1]
 ### Fixed
 - App closing right after opening (hover style on sound tiles was placed where Avalonia doesn't allow it)

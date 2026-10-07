@@ -66,7 +66,7 @@ YouTube changes its system every now and then.
 - This is a personal tool for having fun with friends. Streaming from YouTube outside its official player goes against YouTube's Terms of Service, so don't sell it or run it as a service.
 - App data (soundboards, icons, settings, log): `%AppData%\BoobiesSoundpad`
 
-## Credits and license
+## License
 
-Built on **[BoomBx](https://github.com/sardeq/BoomBx)** by sardeq, licensed under Apache 2.0. See `LICENSE` and `NOTICE` for the full license and the list of changes.
+Apache 2.0, see `LICENSE`.
 YouTube search and streaming use [YoutubeExplode](https://github.com/Tyrrrz/YoutubeExplode), with [yt-dlp](https://github.com/yt-dlp/yt-dlp) as a backup. Audio runs on [NAudio](https://github.com/naudio/NAudio).

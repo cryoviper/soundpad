@@ -150,14 +150,91 @@ namespace BoomBx.Services
         /// Blocking - call from a background thread.
         /// </summary>
         public WaveStream OpenAudio(string videoId, Action<double>? progress, CancellationToken ct)
-            => OpenDecoder(GetAudioBytes(videoId, progress, ct));
+        {
+            var cached = GetCached(videoId);
+            if (cached != null)
+            {
+                progress?.Invoke(1);
+                return OpenDecoder(cached);
+            }
+
+            // Fast path: start playing after the first ~200 KB while the rest keeps downloading.
+            try
+            {
+                return OpenProgressive(videoId, progress, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (Exception ex)
+            {
+                Logger.Log($"[YouTube] quick start failed for {videoId}: {ex.Message}");
+                Log?.Invoke("Main engine slow, trying backup...");
+            }
+
+            return OpenDecoder(GetAudioBytes(videoId, progress, ct, skipMain: true));
+        }
+
+        private WaveStream OpenProgressive(string videoId, Action<double>? progress, CancellationToken ct)
+        {
+            using var manifestTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            manifestTimeout.CancelAfter(TimeSpan.FromSeconds(12));
+            var manifest = _client.Videos.Streams.GetManifestAsync(VideoId.Parse(videoId), manifestTimeout.Token)
+                .AsTask().GetAwaiter().GetResult();
+
+            var audio = manifest.GetAudioOnlyStreams()
+                .OrderByDescending(s => s.Container.Name.Equals("mp4", StringComparison.OrdinalIgnoreCase))
+                .ThenByDescending(s => s.Bitrate.BitsPerSecond)
+                .FirstOrDefault()
+                ?? throw new InvalidOperationException("No audio stream found for this video");
+
+            long size = audio.Size.Bytes;
+            var stream = new ProgressiveStream(size);
+
+            // Download keeps running in the background while we play.
+            _ = Task.Run(async () =>
+            {
+                using var watchdog = new StallWatchdog(ct, TimeSpan.FromSeconds(20));
+                try
+                {
+                    await using var source = await _client.Videos.Streams.GetAsync(audio, watchdog.Token);
+                    var buffer = new byte[64 * 1024];
+                    long total = 0;
+                    int read;
+                    while ((read = await source.ReadAsync(buffer.AsMemory(0, buffer.Length), watchdog.Token)) > 0)
+                    {
+                        stream.Append(buffer, 0, read);
+                        total += read;
+                        watchdog.Alive();
+                        if (size > 0) progress?.Invoke(Math.Min(1.0, total / (double)size));
+                    }
+                    stream.Complete();
+                    progress?.Invoke(1);
+                    AddToCache(videoId, stream.ToArray());
+                    Logger.Log($"[YouTube] {videoId}: downloaded {total / 1024} KB");
+                }
+                catch (Exception ex)
+                {
+                    stream.Fail(ex);
+                    if (!ct.IsCancellationRequested) Logger.Log($"[YouTube] {videoId}: download stopped: {ex.Message}");
+                }
+            }, CancellationToken.None);
+
+            // Enough to read the header and a few seconds of audio.
+            long startBytes = size > 0 ? Math.Min(size, 192 * 1024) : 192 * 1024;
+            if (!stream.WaitForBytes(startBytes, TimeSpan.FromSeconds(10), ct))
+            {
+                stream.Fail(new TimeoutException("too slow"));
+                throw new TimeoutException("YouTube is sending data too slowly");
+            }
+
+            return new StreamMediaFoundationReader(stream, ReaderSettings);
+        }
 
         /// <summary>
         /// The raw audio file of a video (usually m4a), from RAM cache or downloaded into memory.
         /// Tries the main engine first, then yt-dlp. Only returns data Windows can decode.
         /// Blocking - call from a background thread.
         /// </summary>
-        public byte[] GetAudioBytes(string videoId, Action<double>? progress, CancellationToken ct)
+        public byte[] GetAudioBytes(string videoId, Action<double>? progress, CancellationToken ct, bool skipMain = false)
         {
             var cached = GetCached(videoId);
             if (cached != null)
@@ -169,6 +246,7 @@ namespace BoomBx.Services
             var errors = new List<string>();
 
             // 1) YoutubeExplode
+            if (!skipMain)
             try
             {
                 var bytes = DownloadWithYoutubeExplode(videoId, progress, ct);

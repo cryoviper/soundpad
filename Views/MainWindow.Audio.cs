@@ -180,7 +180,7 @@ namespace BoomBx.Views
 
                 _audioWaveOutSpeaker = new WasapiOut(defaultSpeaker, AudioClientShareMode.Shared, true, 100);
                 _audioWaveOutSpeaker.PlaybackStopped += HandlePlaybackStopped;
-                _audioWaveOutSpeaker.Init(_volumeProviderSpeaker);
+                _audioWaveOutSpeaker.Init(new SoftLimiterSampleProvider(_volumeProviderSpeaker));
                 _audioWaveOutSpeaker.Play();
             }
             catch (Exception ex)
